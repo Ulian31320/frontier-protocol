@@ -1,46 +1,49 @@
-# 开发架构说明（v0.1.2）
+# 边境协议 v0.2.0 架构说明
 
-## 运行顺序
+## 基本运行
 
-`index.html` 加载 `css/styles.css`，并使用 `defer` 加载 `js/game.js`。JS 入口为 `init()`，先调用 `load()` 恢复存档，再首次执行 `render(true)`，最后注册点击处理和游戏循环。
+`index.html` 会依次加载 `css/styles.css`、`js/art.js`、`js/game.js`。游戏入口是 `init()`：读取并升级存档、渲染页面、绑定事件，之后以定时器更新资源和战斗。
 
-## 数据模型
+没有后端，所有游戏逻辑和存档都在浏览器内执行。
 
-游戏状态位于 `js/game.js` 的 `s`。`fresh()` 建立全新角色，包含：
-- `credits`、`alloy`、`energy`、`data`：基本资源
-- `buildings`：建筑等级
-- `ops`：队员等级和经验；`recruited`：已招募队员
-- `gear`：装备强化等级；`cores`：永久协议核心
-- `stage`：探索区域编号；`killsStage`：本区域清除目标数
-- `enemyHp`：当前目标耐久
-- `logs`、`totalKills`、`lastSave`：日志与统计
+## 数据模型与旧存档
 
-## 逻辑分层
+全局运行状态为 `s`，由 `fresh(cores)` 创建。`hydrate(p)` 会把 v1 / v2 的存档映射到当前默认数据模型。**保持 `SAVEKEY='frontier_protocol_original_v1'` 不变**，这样原版本浏览器同源存档可以自动升级。
 
-- `bld`：设施配表，名称、生产速率、费用公式
-- `opDefs`：队员配表，战力与招募成本
-- `zones`：区域配表（超过定义数量后复用最后一组名称）
-- `tick(dt)`：每个时间步增加建筑资源、降低敌方耐久、发放奖励与经验
-- `build/recruit/strengthen/advance/reboot`：用户主动操作
-- `render(full)`：局部高频刷新，和周期性完整界面刷新
-- `go(tab)`：五个面板的切换
-- `load/save/valid/modal`：localStorage 存档和 JSON 导入导出
-- `init()`：事件绑定和定时器
+- 资源：`credits, alloy, energy, data, parts`。
+- 建筑：`buildings`，键来自 `bld` 配表。
+- 干员：`ops, recruited, focus`。
+- 装备：`inventory, equipped, uid, autoEquip`。
+- 地区和战斗：`stage, maxStage, killsStage, enemyHp, squadHp, retreat, totalKills`。
+- 技术与任务：`tech, claimed, dispatch, policy, autoAdvance`。
+- 永久成长：`cores`。
 
-## 重要约束与已知范围
+新增状态字段须同时在 `fresh()` 和 `hydrate()` 中维护默认值，不能修改旧字段含义。
 
-1. 浏览器 Tab 被后台节流是正常情况，重新载入页面后由 `load()` 补算离线收益（上限 8 小时，收益系数 70%）。
-2. 本版仅保留客户端存档，不能自动跨设备云同步。
-3. `SAVEKEY = 'frontier_protocol_original_v1'` 不要随意更改；`version: 1` 是存档结构版本，不是游戏发行版号。
-4. `valid()` 负责限制导入的数据结构。添加字段时请编写兼容旧存档的默认值或迁移方法。
-5. 动态按钮依靠 `data-build`、`data-recruit`、`data-gear` 和顶层事件委托；修改 HTML 需同步维护。
-6. 无联网接口，所有战斗与经济数值均在浏览器本地计算，因此不适合作为公平竞争的多人游戏服务端。
-7. 修改游戏样式时请至少检查 375px（手机）和 1280px（桌面）布局。
+## 配置与计算
 
-## 后续推荐开发顺序
+- `opDefs`：角色初始属性，包含肖像绘制需要的 `colors`（三个颜色）。
+- `bld`：建筑的基本产出、原料消耗、升级成本与解锁条件。
+- `zoneDefs`：区域名称、描述与敌人。
+- `techDefs`：研究成本、倍率、最大等级及区域前置条件。
+- `missions`：任务进度字段、阈值、奖励。
+- `dispatchDefs`：派遣时间、消耗、奖励。
+- `simulateProduction(dt)`：产量和能源约束，支持离线倍率。
+- `simulateCombat(dt)`：敌方反击、敌人击杀、队伍撤退与维修。
+- `makeItem()`：装备随机化。
+- `render(true)`：8 个页面的动态内容；`render(false)`：资源与战斗即时数字。
+- `go(tab)`：导航，8 个页面 ID 必须和 `tabMeta` 保持一致。
 
-1. 分解 `game.js` 为配置、存档、核心模拟、渲染等模块，配合测试。
-2. 扩展角色装备、随机掉落与自动装备规则。
-3. 引入具有真实供需约束的生产链。
-4. 多区域地图、编队和敌人类型。
-5. 如果需要跨设备自动同步，再单独设计账号系统和后端存档。
+## 部署和测试注意
+
+1. 初次设置 GitHub Pages 为 `main` + `/(root)`。静态源码推送后即可由 GitHub Pages 部署。
+2. 项目没有 CDN / API 依赖，所有必须的文件都在仓库内。
+3. 修改动态卡片内的 `data-*` 按钮时，同时修改 `init()` 中的点击委托逻辑。
+4. 修改角色配表时记得同步 `colors` 字段，否则 `portraitSvg()` 无法渲染，可能造成整页 UI 初始化失败。
+5. GitHub Pages 与本地文件是不同的 localStorage 来源，请用游戏内 JSON 导出 / 导入进行迁移。
+6. 浏览器脚本因受限而不能执行时，页面会显示运行环境提示。**不要把静态 HTML 预览视为真实游戏测试**。
+7. 每次发布前运行 `node --check js/game.js` 和 `node tests/smoke.cjs`；有本地浏览器权限时再运行 Playwright 测试，检查宽屏 / 390px 手机布局。
+
+## 下一阶段方向
+
+扩充干员与敌人技能表现、装备词条和掉落池、具备独立编成位置的小队系统、任务叙事及声音反馈。现有版本已经可以循环游玩，但尚不属于有完整剧情、多角色 Live2D 和复杂 3D 动画的正式商业游戏。

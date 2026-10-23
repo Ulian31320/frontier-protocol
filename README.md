@@ -1,49 +1,46 @@
 # 边境协议 / FRONTIER PROTOCOL
 
-原创工业科幻题材网页放置养成游戏。**v0.1.2**，支持桌面与移动设备。
+**v0.2.0 — 拓荒扩展版。** 原创工业科幻题材放置养成网页游戏，适配电脑、平板和手机浏览器。
 
-## 在线部署（GitHub Pages）
+本项目从《Progress Knight》的持续成长体系与《Trimps》的地图清理玩法中吸取设计灵感，但游戏代码、美术与故事均为本项目独立实现。无须服务器及外部 CDN。
 
-将本文件夹**内部的全部文件和目录**放入仓库的 `main` 分支根目录，确保 `index.html` 直接位于仓库顶层。
+## 核心玩法
 
-在 GitHub 仓库中打开 **Settings → Pages → Build and deployment**，选择：
-- Source: **Deploy from a branch**
-- Branch: **main**
-- Folder: **/ (root)**
-- 点击 Save。
+- **工业生产**：6 种设施，产出信用点、合金、能源、研究数据与零件；高级设施消耗原料，均衡、工业超频、战斗超频三种运行策略。
+- **自动探索**：10 个不同地区、每区 6 次清理目标、区域首领、敌方反击、小队战损和自动修复；已解锁区域可以随时返回刷资源。
+- **干员养成**：3 名初始队员，招募、自动获取战斗经验、集训重点与消耗数据的训练。
+- **战利品**：随机属性的主武器、防护装具与战术芯片；标准、精良、卓越三级品质，装备、卸下、拆解、制造和自动换装。
+- **研究与委托**：10 项技术、多级成长树、9 条里程碑任务及 3 种可重复的后勤派遣。
+- **长期成长**：区域 05 解锁协议重启，获得永久核心；保留 v0.1.2 的浏览器存档并自动迁移到新数据格式。
+- **离线进度**：离线资源最多计算 8 小时，自动战斗最多计算 1 小时。任务派遣通过结束时间结算。
 
-GitHub Pages 将自动在每次向 `main` 分支提交更新后重新发布。普通项目仓库的网址格式：
+## 直接游玩与 GitHub Pages
 
-`https://<GitHub用户名>.github.io/<仓库名>/`
+在 GitHub 仓库设置：**Settings → Pages → Deploy from a branch → main → /(root)**。
 
-注意：游戏存档存于浏览器的 `localStorage`，GitHub Pages 和本地文件的存档不会自动同步。更换设备/浏览器前请在游戏内导出 JSON 存档，并在新设备上导入。
+访问 `https://<用户名>.github.io/<仓库名称>/`。
 
-## 本地运行
+请使用浏览器直接访问发布后的网站，不要在聊天附件的静态 HTML 预览器中游玩。浏览器存档基于 localStorage，**不支持自动跨设备同步**，需要在「协议记录」导出 / 导入 JSON 存档。
 
-在支持 JavaScript 的浏览器中打开 `index.html`。**不要直接在 ChatGPT 附件静态预览里游玩**，预览可能禁止脚本执行。
+## 代码结构
 
-## 文件说明
-
-| 文件 | 作用 |
+| 路径 | 作用 |
 | --- | --- |
-| `index.html` | 页面结构、菜单、五个主要页面、内联原创 SVG 场景 |
-| `css/styles.css` | 颜色、卡片、工业风布局、响应式与手机端 |
-| `js/game.js` | 建筑、经济、战斗、角色成长、区域推进、存档、交互 |
-| `docs/ARCHITECTURE.md` | 系统设计、常见修改位置、未来更新注意事项 |
-| `CHANGELOG.md` | 版本改动记录 |
-| `.nojekyll` | GitHub Pages 按原样发布静态文件 |
+| `index.html` | 8 个功能页面及原创 SVG 场景 |
+| `css/styles.css` | 工业风 UI、手机版响应式布局 |
+| `js/art.js` | 原创设施 / 角色 SVG 生成器 |
+| `js/game.js` | 游戏模拟、资源、战斗、装备、研究、存档、UI 逻辑 |
+| `tests/smoke.cjs` | 可在 Node.js 运行的游戏逻辑回归测试 |
+| `tests/browser_test.py` | Playwright Chromium DOM 交互测试（无须网络或本地 HTTP 服务） |
+| `docs/ARCHITECTURE.md` | 数据模型与维护说明 |
+| `CHANGELOG.md` | 版本历史 |
 
-## 开发约定
+## 修改规范
 
-1. 每项功能修改都应有**中文注释**，说明用途、参数及与其它系统的关联。
-2. 不要把主游戏逻辑重新塞进 `index.html`；对应修改 `js/game.js`。
-3. 每次修改后更新 `CHANGELOG.md`，使用 `feat: ...` / `fix: ...` / `docs: ...` 的提交信息。
-4. 修改资源、数值时检查建筑与队员是否能正常解锁，避免卡死。
-5. 改动存档字段时必须考虑向后兼容，禁止未经迁移直接重命名现有存档键。
-6. 如需加入第三方素材或代码，核对其许可证并在项目内保留必要署名。
+所有主要游戏系统维护中文注释，新增功能需更新测试及 `CHANGELOG.md`，并兼容旧存档字段。建议通过 Git 分支和 Pull Request 更新大型功能。所有资源与玩法都采用原创实现；第三方素材加入时必须遵循许可证。
 
-## 灵感与版权说明
+## 本地测试
 
-游戏中的场景、SVG 角色和界面为本项目原创素材，不包含《明日方舟》或《明日方舟：终末地》官方角色立绘、Logo 或游戏文件。本项目仅借鉴工业科幻美术氛围。放置成长的设计思路参考公开游戏 [Progress Knight](https://github.com/ihtasham42/progress-knight)，该项目使用 Unlicense。
+`node --check js/game.js && node tests/smoke.cjs`
 
-此仓库是单机静态网页，不需要后端。**代码通过 GitHub 托管不代表本仓库已自动上线；需要首次开启 GitHub Pages。**
+运行浏览器版测试需要 Python Playwright 和 Chromium：`python tests/browser_test.py`。它在浏览器内存中装载 HTML / CSS / JS 并模拟存档，仅验证真实 DOM 点击与布局，不代替上线后检查 GitHub Pages 资源加载。上传 GitHub 后测试不会自动执行，除非另行配置 CI。
