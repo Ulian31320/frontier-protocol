@@ -19,7 +19,7 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(root,'js/art.js'),'utf8'),ctx);
 vm.runInContext(fs.readFileSync(path.join(root,'js/game.js'),'utf8'),ctx);
 function run(s){return vm.runInContext(s,ctx)}
-assert.equal(run('s.version'),3);
+assert.equal(run('s.version'),4);
 assert.equal(run('s.recruited.length'),1);
 assert(element('operatorCards').innerHTML.includes('临川'));
 assert(element('facilityCards').innerHTML.includes('远程采矿机'));
@@ -40,7 +40,7 @@ run('selectZone(2)');assert.equal(run('s.stage'),2);
 run('const snap=JSON.stringify(s);s=fresh();s=hydrate(JSON.parse(snap));render(true)');assert(run('s.inventory.length')>0);
 const old={version:1,credits:1000,alloy:230,energy:50,data:42,buildings:{mine:4,solar:2,trade:1,lab:0},ops:{lin:{level:15,xp:3},yor:{level:4,xp:0},shi:{level:1,xp:0}},recruited:['lin','yor'],gear:3,cores:2,stage:4,killsStage:2,totalKills:71,totalEarned:1500,enemyHp:200,logs:[],created:Date.now(),lastSave:Date.now()};
 ctx.old=old;run('s=hydrate(old);render(true)');
-assert.equal(run('s.version'),3);assert.equal(run('s.cores'),2);assert.equal(run('s.buildings.mine'),4);assert.equal(run('s.ops.lin.level'),15);assert.equal(run('s.stage'),4);
+assert.equal(run('s.version'),4);assert.equal(run('s.cores'),2);assert.equal(run('s.buildings.mine'),4);assert.equal(run('s.ops.lin.level'),15);assert.equal(run('s.stage'),4);
 assert.equal(run('typeof s.tech'),'object');
 // 中文状态文案以及跨页面按钮输出验证
 for(const label of ['技术研发','装备仓库','任务终端'])assert(html.includes(label));
