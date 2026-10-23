@@ -1,4 +1,4 @@
-# 边境协议 v0.2.0 架构说明
+# 边境协议 v0.3.0 架构说明
 
 ## 基本运行
 
@@ -8,12 +8,12 @@
 
 ## 数据模型与旧存档
 
-全局运行状态为 `s`，由 `fresh(cores)` 创建。`hydrate(p)` 会把 v1 / v2 的存档映射到当前默认数据模型。**保持 `SAVEKEY='frontier_protocol_original_v1'` 不变**，这样原版本浏览器同源存档可以自动升级。
+全局运行状态为 `s`，由 `fresh(cores)` 创建。`hydrate(p)` 会把 v1 / v2 / v3 的存档映射到当前默认数据模型。**保持 `SAVEKEY='frontier_protocol_original_v1'` 不变**，这样原版本浏览器同源存档可以自动升级。
 
 - 资源：`credits, alloy, energy, data, parts`。
 - 建筑：`buildings`，键来自 `bld` 配表。
 - 干员：`ops, recruited, focus`。
-- 装备：`inventory, equipped, uid, autoEquip`。
+- 装备：`inventory, loadouts, uid, autoEquip, autoSalvage, storageLevel, selectedOp, inventoryFilter`。
 - 地区和战斗：`stage, maxStage, killsStage, enemyHp, squadHp, retreat, totalKills`。
 - 技术与任务：`tech, claimed, dispatch, policy, autoAdvance`。
 - 永久成长：`cores`。
@@ -30,7 +30,13 @@
 - `dispatchDefs`：派遣时间、消耗、奖励。
 - `simulateProduction(dt)`：产量和能源约束，支持离线倍率。
 - `simulateCombat(dt)`：敌方反击、敌人击杀、队伍撤退与维修。
-- `makeItem()`：装备随机化。
+- `makeItem()`：装备随机化（主词条与随机副词条）。
+- `affixes()`：统一展示所有真实生效的装备属性（旧装备缺省副词条为 0）。
+- `loadouts[op][slot]`：每名干员独立 3 个装备槽，`equippedIds()` 和 `assignedTo(id)` 用于保护已穿戴装备。
+- `autoEquipBest()`：每个装备部位进行全队唯一分配，禁止一个 ID 同时属于多人。
+- `autoSalvageSweep()`：只处理符合配置稀有度、未穿戴且未锁定的装备。
+- `storageUsed()`：只统计未穿戴装备；`storageCapacity()` 为 60 + 20 × 扩容等级。
+- `openItem()`：在弹窗中展示完整词条，装备卡片只显示主要信息。
 - `render(true)`：8 个页面的动态内容；`render(false)`：资源与战斗即时数字。
 - `go(tab)`：导航，8 个页面 ID 必须和 `tabMeta` 保持一致。
 
@@ -42,7 +48,8 @@
 4. 修改角色配表时记得同步 `colors` 字段，否则 `portraitSvg()` 无法渲染，可能造成整页 UI 初始化失败。
 5. GitHub Pages 与本地文件是不同的 localStorage 来源，请用游戏内 JSON 导出 / 导入进行迁移。
 6. 浏览器脚本因受限而不能执行时，页面会显示运行环境提示。**不要把静态 HTML 预览视为真实游戏测试**。
-7. 每次发布前运行 `node --check js/game.js` 和 `node tests/smoke.cjs`；有本地浏览器权限时再运行 Playwright 测试，检查宽屏 / 390px 手机布局。
+7. 存档由 v2 → v3 时，`p.equipped` 的全队旧装备迁移至第一名已招募干员，仓库、规则、锁定状态保持默认；不要删除此迁移。
+8. 每次发布前运行 `node --check js/game.js` 和 `node tests/smoke.cjs` 及 `node tests/inventory_extended.cjs`；有本地浏览器权限时再运行 Playwright 测试，检查宽屏 / 390px 手机布局。
 
 ## 下一阶段方向
 

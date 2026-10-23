@@ -1,6 +1,6 @@
 'use strict';
 /*
- * 《边境协议》v0.2.0 游戏主引擎
+ * 《边境协议》v0.3.0 游戏主引擎
  * 放置成长参考 Progress Knight 的长期经验曲线、Trimps 的区域推进与地图奖励。
  * 该项目的素材、文案和程序为原创实现；不包含上述游戏的源代码。
  *
@@ -71,15 +71,15 @@ const dispatchDefs={
  convoy:{name:'货物护送',detail:'自动车队运送可回收物资',sec:90,cost:{energy:35,credits:70},reward:{credits:310,alloy:85},unlock:2},
  core:{name:'废墟搜寻',detail:'进行深层维修及物资回收',sec:160,cost:{energy:65,alloy:35},reward:{parts:16,data:75},unlock:3}
 };
-const tabMeta={overview:['总控概览','当前目标、工业产能与远征动态'],factory:['基地建设','产业链 · 能源调度 · 自动生产'],battle:['前线探索','区域推进 · 首领遭遇 · 自动战斗'],operators:['行动小队','队员成长 · 培训分工 · 装备装配'],inventory:['战利品库','随机词条 · 手动装备 · 拆解制造'],research:['技术研发','规划前置研究 · 定向强化基地'],missions:['任务终端','里程碑 · 可重复后勤派遣'],protocol:['协议档案','永久成长 · 数据与存档']};
+const tabMeta={overview:['总控概览','当前目标、工业产能与远征动态'],factory:['基地建设','产业链 · 能源调度 · 自动生产'],battle:['前线探索','区域推进 · 首领遭遇 · 自动战斗'],operators:['行动小队','队员成长 · 培训分工 · 装备装配'],inventory:['装备仓库','角色独立配装 · 词条详情 · 自动回收'],research:['技术研发','规划前置研究 · 定向强化基地'],missions:['任务终端','里程碑 · 可重复后勤派遣'],protocol:['协议档案','永久成长 · 数据与存档']};
 
 // 新档案结构。不改旧字段语义，额外字段在 hydrate 中补全。
-function fresh(cores=0){return {version:2,credits:340,alloy:50,energy:34,data:0,parts:0,
+function fresh(cores=0){return {version:3,credits:340,alloy:50,energy:34,data:0,parts:0,
  buildings:Object.fromEntries(Object.keys(bld).map(k=>[k,k==='mine'||k==='solar'?1:0])),
  ops:Object.fromEntries(Object.keys(opDefs).map(k=>[k,{level:1,xp:0}])),recruited:['lin'],
  gear:0,cores,stage:1,maxStage:1,killsStage:0,totalKills:0,totalEarned:0,totalAlloy:50,totalParts:0,
- lootCount:0,enemyHp:0,squadHp:100,retreat:0,tech:{},claimed:{},inventory:[],equipped:{weapon:null,armor:null,module:null},uid:1,
- focus:'lin',policy:'normal',autoAdvance:false,autoEquip:false,dispatch:null,logs:[],created:Date.now(),lastSave:Date.now()};}
+ lootCount:0,enemyHp:0,squadHp:100,retreat:0,tech:{},claimed:{},inventory:[],loadouts:Object.fromEntries(Object.keys(opDefs).map(k=>[k,emptyLoadout()])),storageLevel:0,autoSalvage:'none',uid:1,
+ focus:'lin',selectedOp:'lin',inventoryFilter:'all',policy:'normal',autoAdvance:false,autoEquip:false,dispatch:null,logs:[],created:Date.now(),lastSave:Date.now()};}
 let s=fresh();let tab='overview';let lastTick=Date.now(),lastSave=Date.now(),lastFull=0,toastTimer=0,completedDispatches=0;
 const zone=()=>zoneDefs[Math.min(s.stage-1,zoneDefs.length-1)];
 const high=()=>s.maxStage||s.stage;
@@ -92,14 +92,36 @@ const totalProd=()=>Object.keys(bld).reduce((v,k)=>v+prod(k),0);
 const enemyBoss=()=>s.killsStage%6===5;
 const enemyMaxHp=()=>Math.round(24*Math.pow(1.52,s.stage-1)*(enemyBoss()?3.2:1));
 const enemyDmg=()=>.65*Math.pow(1.27,s.stage-1)*(enemyBoss()?1.7:1);
-const maxSquadHp=()=>100+researchLv('plating')*25+(s.recruited.includes('shi')?55:0)+(s.equipped.armor?Number(equippedItem('armor')?.hp||0):0);
-const dps=()=>{let base=s.recruited.reduce((sum,k)=>sum+opDefs[k].base*(1+(s.ops[k].level-1)*opDefs[k].bonus)*(s.focus===k?1.08:1),0);return (base+Number(equippedItem('weapon')?.atk||0))*(1+s.gear*.22)*(1+researchLv('tactics')*.2)*mult()*(s.policy==='combat'&&s.energy>1?1.35:1)};
-const itemLootBonus=()=>Number(equippedItem('module')?.loot||0);
+// 每名已招募角色分别有三个装备槽。装备通过物品唯一 ID 关联，不能被重复穿戴。
+const equippedIds=()=>new Set(s.recruited.flatMap(k=>Object.values(s.loadouts[k]||{})).filter(Number.isInteger));
+const equippedItem=(k,slot)=>s.inventory.find(i=>i.id===s.loadouts[k]?.[slot])||null;
+const sumGear=field=>s.recruited.reduce((acc,k)=>acc+Object.keys(slotDefs).reduce((v,slot)=>v+Number(equippedItem(k,slot)?.[field]||0),0),0);
+const maxSquadHp=()=>100+researchLv('plating')*25+(s.recruited.includes('shi')?55:0)+sumGear('hp');
+const dps=()=>{let base=s.recruited.reduce((sum,k)=>sum+opDefs[k].base*(1+(s.ops[k].level-1)*opDefs[k].bonus)*(s.focus===k?1.08:1)+Object.keys(slotDefs).reduce((v,slot)=>v+Number(equippedItem(k,slot)?.atk||0),0),0);return base*(1+sumGear('crit')*.0035)*(1+s.gear*.22)*(1+researchLv('tactics')*.2)*mult()*(s.policy==='combat'&&s.energy>1?1.35:1)};
+const itemLootBonus=()=>sumGear('loot');
 const reward=()=>Math.ceil((14+s.stage*10)*(1+researchLv('mapping')*.2)*mult()*(enemyBoss()?3:1));
 function addLog(msg){s.logs.unshift({ts:Date.now(),msg});s.logs=s.logs.slice(0,25)}
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2300)}
 function levelCap(level){return Math.round(45*(level+1)*Math.pow(1.025,level))}
-function equippedItem(slot){return s.inventory.find(i=>i.id===s.equipped[slot])||null}
+function emptyLoadout(){return {weapon:null,armor:null,module:null}}
+function assignedTo(id){for(const k of s.recruited)for(const slot of Object.keys(slotDefs))if(s.loadouts[k]?.[slot]===id)return k;return null}
+const storageCapacity=()=>60+20*s.storageLevel;
+const storageUsed=()=>s.inventory.filter(i=>!equippedIds().has(i.id)).length;
+function storageCost(){const l=s.storageLevel;return {credits:Math.ceil(240*Math.pow(1.67,l)),alloy:Math.ceil(75*Math.pow(1.6,l)),parts:Math.ceil(3*Math.pow(1.53,l))}}
+function upgradeStorage(){if(s.storageLevel>=25){toast('仓库已达当前容量上限');return}if(!pay(storageCost())){toast('仓库扩建所需资源不足');return}s.storageLevel++;addLog(`装备库扩建至 ${storageCapacity()} 格`);changed()}
+const affixNames={atk:'攻击',hp:'耐久',loot:'回收概率',crit:'暴击效率',guard:'伤害抵抗',xp:'经验增幅'};
+const affixInfo={atk:'直接提高角色造成的每秒伤害。',hp:'增加全队共享防护耐久上限。',loot:'提高击败普通目标后获得装备的概率。',crit:'提高全队伤害倍率，每点增加 0.35%。',guard:'降低敌人对小队造成的伤害，每点降低 0.3%，最多降低 55%。',xp:'提高已出战队员获得的战斗经验。'};
+const affixUnit=k=>['loot','crit','guard','xp'].includes(k)?'%':'';
+const affixes=i=>['atk','hp','loot','crit','guard','xp'].filter(k=>Number(i[k])>0).map(k=>({key:k,value:Number(i[k])}));
+const statLabel=(k,v)=>`${affixNames[k]} +${Number(v).toLocaleString('zh-CN')}${affixUnit(k)}`;
+const score=(i,k)=>{if(!i)return 0;const d=opDefs[k]||opDefs.lin;return Number(i.atk||0)*(d.base>=10?3.3:3)+Number(i.hp||0)*(k==='shi'?.34:.22)+Number(i.loot||0)*7+Number(i.crit||0)*2.5+Number(i.guard||0)*(k==='shi'?3:2)+Number(i.xp||0)*2};
+// 自动配装是整队的全局贪心匹配：同一件装备只能分配给一个角色。
+function autoEquipBest(){const used=new Set();for(const slot of Object.keys(slotDefs)){const available=s.inventory.filter(i=>i.slot===slot).sort((a,b)=>Math.max(...s.recruited.map(k=>score(b,k)))-Math.max(...s.recruited.map(k=>score(a,k))));const pending=new Set(s.recruited);while(pending.size){let best=null;for(const op of pending){for(const i of available){if(used.has(i.id))continue;const gain=score(i,op);if(!best||gain>best.gain)best={op,i,gain}}}if(!best)break;s.loadouts[best.op][slot]=best.i.id;used.add(best.i.id);pending.delete(best.op)}for(const op of pending)s.loadouts[op][slot]=null}}
+function autoSalvageSweep(){if(s.autoSalvage==='none')return 0;const threshold=s.autoSalvage==='common'?0:1;let n=0;for(const i of [...s.inventory]){if(i.rarity>threshold||i.locked||assignedTo(i.id))continue;s.inventory=s.inventory.filter(x=>x.id!==i.id);credit('parts',salvageReward(i));n++}if(n)addLog(`自动分解 ${n} 件低稀有度装备`);return n}
+function setAutoSalvage(rule){if(!['none','common','rare'].includes(rule))return;s.autoSalvage=rule;autoSalvageSweep();toast(rule==='none'?'已关闭自动分解':'已启用低阶自动分解（保护穿戴与锁定装备）');changed()}
+function toggleLock(id){const i=s.inventory.find(x=>x.id===id);if(!i)return;i.locked=!i.locked;changed();openItem(id)}
+function selectOp(k){if(!s.recruited.includes(k))return;s.selectedOp=k;render(true)}
+function setInventoryFilter(k){if(!['all','0','1','2'].includes(k))return;s.inventoryFilter=k;render(true)}
 function afford(c){return Object.entries(c).every(([k,v])=>s[k]+1e-6>=v)}
 function pay(c){if(!afford(c))return false;for(const [k,v] of Object.entries(c))s[k]=Math.max(0,s[k]-v);return true}
 function credit(k,v){if(!v||v<=0)return;s[k]+=v;if(k==='credits')s.totalEarned+=v;if(k==='alloy')s.totalAlloy+=v;if(k==='parts')s.totalParts+=v}
@@ -110,20 +132,26 @@ function researchCost(k){let x=techDefs[k],lv=researchLv(k);return Object.fromEn
 function gearCost(){return {credits:Math.ceil(90*Math.pow(1.46,s.gear)),alloy:Math.ceil(24*Math.pow(1.47,s.gear)),energy:Math.ceil(11*Math.pow(1.38,s.gear))}}
 function trainCost(k){return {credits:Math.ceil(50*Math.pow(1.25,s.ops[k].level)),data:Math.ceil(8*Math.pow(1.2,s.ops[k].level))}}
 function salvageReward(i){return Math.ceil(rarityDefs[i.rarity].salvage*(1+researchLv('salvage')*.25))}
-function itemScore(i){return i.atk*3+i.hp*.24+i.loot*8}
+function itemScore(i){return score(i,s.selectedOp)}
 function chanceLoot(){return Math.min(.72,.20+researchLv('salvage')*.04+itemLootBonus()*.005)}
-// 道具模型：每件装备生成一个唯一 ID，稀有度和区域决定具体属性。
-function makeItem(forceRarity){let roll=Math.random()*100,rarity=forceRarity??(roll<6?2:roll<30?1:0);let slots=Object.keys(slotDefs),slot=slots[Math.floor(Math.random()*slots.length)];let d=rarityDefs[rarity];let scale=(1+s.stage*.3)*d.mult;let i={id:s.uid++,slot,rarity,zone:s.stage,atk:0,hp:0,loot:0,name:`${slotDefs[slot].prefix[Math.floor(Math.random()*4)]}${slotDefs[slot].name} · ${itemSuffix[Math.floor(Math.random()*5)]}`};
+// 新装备属性：每个槽位有基础主词条，精良、卓越额外随机副词条。
+// UI 仅显示主属性和词条数量，细项说明在装备详情弹窗中提供。
+function makeItem(forceRarity){const roll=Math.random()*100,rarity=forceRarity??(roll<6?2:roll<30?1:0);const slots=Object.keys(slotDefs),slot=slots[Math.floor(Math.random()*slots.length)],d=rarityDefs[rarity],scale=(1+s.stage*.3)*d.mult;
+ const i={id:s.uid++,slot,rarity,zone:s.stage,atk:0,hp:0,loot:0,crit:0,guard:0,xp:0,locked:false,name:`${slotDefs[slot].prefix[Math.floor(Math.random()*4)]}${slotDefs[slot].name} · ${itemSuffix[Math.floor(Math.random()*5)]}`};
  if(slot==='weapon')i.atk=Math.ceil((3+Math.random()*4)*scale);if(slot==='armor')i.hp=Math.ceil((12+Math.random()*18)*scale);if(slot==='module')i.loot=Number(((3+Math.random()*5)*d.mult).toFixed(1));
- if(s.inventory.length>=60){const victim=s.inventory.find(x=>!Object.values(s.equipped).includes(x.id));if(victim){s.inventory=s.inventory.filter(x=>x.id!==victim.id);credit('parts',salvageReward(victim))}else{return null}}
- s.inventory.unshift(i);s.lootCount++;
- if(s.autoEquip){const old=equippedItem(slot);if(!old||itemScore(i)>itemScore(old))s.equipped[slot]=i.id}
- addLog(`回收装备：${d.name} · ${i.name}`);return i;
+ const pool=slot==='weapon'?['crit','xp','guard']:slot==='armor'?['guard','xp','crit']:['xp','crit','guard'];
+ for(let n=0;n<rarity;n++){const k=pool.splice(Math.floor(Math.random()*pool.length),1)[0];const v=Number((2+Math.random()*3+rarity*1.5).toFixed(1));i[k]=Number((i[k]+(k==='atk'?Math.ceil(v*scale):k==='hp'?Math.ceil(v*2*scale):v)).toFixed(1))}
+ const oldLoadouts=JSON.stringify(s.loadouts);s.inventory.unshift(i);
+ if(s.autoEquip)autoEquipBest();
+ // 装备数量只计算未穿戴的物品，仓库满时不再暗中丢弃已有的高价值装备。
+ autoSalvageSweep();
+ if(storageUsed()>storageCapacity()){if(s.inventory.some(x=>x.id===i.id)){s.inventory=s.inventory.filter(x=>x.id!==i.id);s.loadouts=JSON.parse(oldLoadouts);for(const op of s.recruited)for(const slot of Object.keys(slotDefs))if(!s.inventory.some(x=>x.id===s.loadouts[op]?.[slot]))s.loadouts[op][slot]=null}addLog('仓库已满，本次拾取失败；可扩容或调整自动分解策略');return null}
+ s.lootCount++;addLog(`回收装备：${d.name} · ${i.name}`);return i;
 }
 // 区域内每六只怪出现一次首领；首领保证掉落装备。击杀获得研究点和经验。
 function victory(){const boss=enemyBoss(),name=boss?'区域首领':zone()[2],creds=reward();s.totalKills++;s.killsStage++;credit('credits',creds);credit('data',2+Math.ceil(s.stage*.85)*(boss?3:1));if(Math.random()<.26)credit('parts',boss?3:1+Math.floor(s.stage/3));
  if(Math.random()<.28)credit('alloy',Math.max(2,s.stage*2));
- for(const k of s.recruited){const o=s.ops[k];o.xp+=(13+s.stage*6)*(1+researchLv('training')*.25)*(s.focus===k?2:1)*(boss?2.2:1);let n=0;while(o.xp>=levelCap(o.level)&&n++<50){o.xp-=levelCap(o.level);o.level++;if(o.level%4===0)addLog(`${opDefs[k].name}训练晋升至 Lv.${o.level}`)}}
+ for(const k of s.recruited){const o=s.ops[k];o.xp+=(13+s.stage*6)*(1+researchLv('training')*.25)*(1+sumGear('xp')*.01)*(s.focus===k?2:1)*(boss?2.2:1);let n=0;while(o.xp>=levelCap(o.level)&&n++<50){o.xp-=levelCap(o.level);o.level++;if(o.level%4===0)addLog(`${opDefs[k].name}训练晋升至 Lv.${o.level}`)}}
  const drop=boss||Math.random()<chanceLoot();if(drop)makeItem(boss?Math.min(2,1+(s.stage>=5&&Math.random()<.22?1:0)):undefined);
  if(boss||s.totalKills%8===0)addLog(`${name} 清除 · +${creds} 信用点${boss?' · 首领物资已回收':''}`);
  if(s.killsStage>=6 && s.autoAdvance && researchLv('autonomy')>0){advance(true)}
@@ -144,7 +172,7 @@ function simulateProduction(dt,offline=false){
 function simulateCombat(dt,offline=false){if(s.retreat>0){s.retreat=Math.max(0,s.retreat-dt);if(s.retreat===0){s.squadHp=maxSquadHp()*.65;addLog('小队完成修复，恢复战斗部署')}return}
  const hpMax=maxSquadHp();if(s.squadHp>hpMax)s.squadHp=hpMax;
  if(s.energy>.06){let heal=Math.min(hpMax-s.squadHp,dt*(1.15+researchLv('plating')*.18));s.squadHp+=heal;s.energy=Math.max(0,s.energy-heal*.07)}
- const incoming=enemyDmg()*dt*(offline?.7:1);s.squadHp=Math.max(0,s.squadHp-incoming);
+ const incoming=enemyDmg()*dt*(offline?.7:1)*Math.max(.45,1-sumGear('guard')*.003);s.squadHp=Math.max(0,s.squadHp-incoming);
  if(s.squadHp<=0){s.retreat=10;addLog('小队护盾耗尽 · 正在自动修复（10 秒）');return}
  let damage=dps()*dt*(offline?.7:1);if(!Number.isFinite(s.enemyHp)||s.enemyHp<=0)s.enemyHp=enemyMaxHp();
  let n=0;while(damage>=s.enemyHp&&n++<150){damage-=s.enemyHp;victory();if(s.retreat>0)break}
@@ -161,7 +189,7 @@ function calculateOffline(seconds){const prodSeconds=Math.min(MAX_OFFLINE,second
  if(seconds>5)addLog(`离线 ${Math.floor(seconds/60)} 分钟：资源最多计 8 小时，战斗最多计 1 小时`);
 }
 function hydrate(p){const base=fresh(Number.isFinite(p?.cores)?p.cores:0);
- if(!p||typeof p!=='object'||(p.version!==1&&p.version!==2))return base;
+ if(!p||typeof p!=='object'||![1,2,3].includes(p.version))return base;
  for(const k of ['credits','alloy','energy','data','parts','gear','cores','stage','maxStage','killsStage','totalKills','totalEarned','totalAlloy','totalParts','lootCount','enemyHp','squadHp','retreat','uid','created','lastSave'])if(Number.isFinite(p[k])&&p[k]>=0)base[k]=p[k];
  base.maxStage=Math.max(base.stage,base.maxStage);base.stage=Math.max(1,Math.min(999,Math.floor(base.stage)));base.maxStage=Math.max(1,Math.min(999,Math.floor(base.maxStage)));
  for(const k of Object.keys(bld))if(Number.isInteger(p.buildings?.[k])&&p.buildings[k]>=0)base.buildings[k]=Math.min(10000,p.buildings[k]);
@@ -169,9 +197,16 @@ function hydrate(p){const base=fresh(Number.isFinite(p?.cores)?p.cores:0);
  if(Array.isArray(p.recruited))base.recruited=[...new Set(p.recruited.filter(k=>opDefs[k]))];if(!base.recruited.length)base.recruited=['lin'];
  for(const k of Object.keys(techDefs))if(Number.isInteger(p.tech?.[k])&&p.tech[k]>=0)base.tech[k]=Math.min(techDefs[k].max,p.tech[k]);
  if(p.claimed&&typeof p.claimed==='object')for(const m of missions)if(p.claimed[m.id])base.claimed[m.id]=true;
- if(Array.isArray(p.inventory))base.inventory=p.inventory.filter(x=>x&&Number.isInteger(x.id)&&x.id>0&&slotDefs[x.slot]&&rarityDefs[x.rarity]&&typeof x.name==='string'&&x.name.length<=80&&['atk','hp','loot'].every(k=>Number.isFinite(x[k])&&x[k]>=0)).slice(0,60);
+ // v0.2 物品只有 3 个字段，新增词条缺省为 0；旧版全队装备分配给第一名角色。
+ base.storageLevel=Number.isInteger(p.storageLevel)?Math.max(0,Math.min(25,p.storageLevel)):0;
+ base.autoSalvage=['none','common','rare'].includes(p.autoSalvage)?p.autoSalvage:'none';
+ if(Array.isArray(p.inventory))base.inventory=p.inventory.filter(x=>x&&Number.isInteger(x.id)&&x.id>0&&slotDefs[x.slot]&&rarityDefs[x.rarity]&&typeof x.name==='string'&&x.name.length<=80&&['atk','hp','loot'].every(k=>Number.isFinite(x[k])&&x[k]>=0))
+ .slice(0,storageCapacityFrom(base)+opCountFrom(base)).map(x=>({...x,crit:Number.isFinite(x.crit)&&x.crit>=0?Math.min(9999,x.crit):0,guard:Number.isFinite(x.guard)&&x.guard>=0?Math.min(9999,x.guard):0,xp:Number.isFinite(x.xp)&&x.xp>=0?Math.min(9999,x.xp):0,locked:x.locked===true}));
  base.uid=Math.max(base.uid,1,...base.inventory.map(i=>i.id+1));
- for(const k of Object.keys(slotDefs)){const id=p.equipped?.[k];if(base.inventory.some(i=>i.id===id&&i.slot===k))base.equipped[k]=id}
+ const occupied=new Set();
+ for(const op of base.recruited){for(const slot of Object.keys(slotDefs)){const id=p.version===3?p.loadouts?.[op]?.[slot]:op===base.recruited[0]?p.equipped?.[slot]:null;if(base.inventory.some(i=>i.id===id&&i.slot===slot)&&!occupied.has(id)){base.loadouts[op][slot]=id;occupied.add(id)}}}
+ if(opDefs[p.selectedOp]&&base.recruited.includes(p.selectedOp))base.selectedOp=p.selectedOp;
+ if(['all','0','1','2'].includes(p.inventoryFilter))base.inventoryFilter=p.inventoryFilter;
  if(opDefs[p.focus]&&base.recruited.includes(p.focus))base.focus=p.focus;
  if(['normal','industry','combat'].includes(p.policy))base.policy=p.policy;
  base.autoAdvance=!!p.autoAdvance;base.autoEquip=!!p.autoEquip;
@@ -179,8 +214,10 @@ function hydrate(p){const base=fresh(Number.isFinite(p?.cores)?p.cores:0);
  if(Array.isArray(p.logs))base.logs=p.logs.filter(x=>x&&typeof x.msg==='string'&&Number.isFinite(x.ts)).slice(0,20);
  // v1 迁移：确保真实的旧武器强化、永久核心和建筑等级保留。
  if(p.version===1){base.totalAlloy=Math.max(base.totalAlloy,base.alloy);base.squadHp=maxHpFrom(base);addLogMigration(base)}
- base.version=2;return base;
+ base.version=3;return base;
 }
+function storageCapacityFrom(v){return 60+20*v.storageLevel}
+function opCountFrom(v){return v.recruited.length*3}
 function maxHpFrom(v){return 100+(v.recruited.includes('shi')?55:0)}
 function addLogMigration(v){v.logs.unshift({ts:Date.now(),msg:'存档已从 v0.1 自动升级为 v0.2，原有资源、建筑和角色等级已保留'})}
 function load(){try{const raw=localStorage.getItem(SAVEKEY);if(raw){s=hydrate(JSON.parse(raw));const off=Math.min(MAX_OFFLINE,Math.max(0,(Date.now()-(s.lastSave||Date.now()))/1000));calculateOffline(off);}else{s=fresh();addLog('前线指挥系统启动 · 采矿与能源生产自动运行')}}catch(e){console.warn('无法读取旧存档，已创建新档案',e);s=fresh();addLog('存档数据读取失败，已新建临时档案')}s.squadHp=Math.min(maxSquadHp(),s.squadHp);s.enemyHp=s.enemyHp||enemyMaxHp();}
@@ -189,13 +226,16 @@ function changed(){save();render(true)}
 
 // 玩家主动操作。禁止交易负库存，资源不足时按钮不生效也会给予原因。
 function build(k){if(!bld[k]||high()<bld[k].unlock)return;const c=buildCost(k);if(!pay(c)){toast('资源不足，请继续生产或调整优先级');return} s.buildings[k]++;addLog(`建造：${bld[k].name} Lv.${s.buildings[k]}`);toast('设施升级完成');changed()}
-function recruit(k){if(s.recruited.includes(k))return;const d=opDefs[k];if(!d||!pay(d.price)){toast('招募所需资源不足');return}s.recruited.push(k);addLog(`队员 ${d.name} 已加入行动小队`);toast('新成员已加入');changed()}
+function recruit(k){if(s.recruited.includes(k))return;const d=opDefs[k];if(!d||!pay(d.price)){toast('招募所需资源不足');return}s.recruited.push(k);if(s.autoEquip)autoEquipBest();addLog(`队员 ${d.name} 已加入行动小队`);toast('新成员已加入');changed()}
 function strengthen(){if(!pay(gearCost())){toast('强化材料不足');return}s.gear++;addLog(`战术装备等级 Mk.${s.gear}`);changed()}
 function train(k){if(!s.recruited.includes(k)||!pay(trainCost(k))){toast('训练资源不足');return}s.ops[k].xp+=levelCap(s.ops[k].level)*.65;while(s.ops[k].xp>=levelCap(s.ops[k].level)){s.ops[k].xp-=levelCap(s.ops[k].level);s.ops[k].level++}addLog(`${opDefs[k].name} 完成集中训练`);changed()}
-function equip(id){let i=s.inventory.find(x=>x.id===id);if(!i)return;s.equipped[i.slot]=id;addLog(`已装备 ${i.name}`);toast('装备已启用');changed()}
-function unequip(slot){s.equipped[slot]=null;changed()}
-function salvage(id){let i=s.inventory.find(x=>x.id===id);if(!i||Object.values(s.equipped).includes(id))return;let gained=salvageReward(i);s.inventory=s.inventory.filter(x=>x.id!==id);credit('parts',gained);addLog(`拆解 ${i.name} · +${gained} 零件`);changed()}
-function forge(){const c={credits:180,alloy:45,parts:8};if(!pay(c)){toast('制造装备需要更多信用点、合金和零件');return}const item=makeItem(Math.random()<.2?1:0);toast(item?`制造完成：${item.name}`:'装备库已满');changed()}
+function equip(id,op=s.selectedOp){const i=s.inventory.find(x=>x.id===id);if(!i||!s.recruited.includes(op))return;const current=s.loadouts[op][i.slot];const from=assignedTo(id);if(from===op)return;
+ // 背包已满时：交换两件装备不会占用额外位置；从背包首次穿戴也会腾出位置。
+ if(from)s.loadouts[from][i.slot]=current||null; // 直接在两名队员间交换装备，不额外占用背包空间
+ s.loadouts[op][i.slot]=id;addLog(`${opDefs[op].name} 已装备 ${i.name}`);toast(`${opDefs[op].name} 装备已更新`);changed()}
+function unequip(slot,op=s.selectedOp){if(!s.recruited.includes(op)||!slotDefs[slot]||!s.loadouts[op][slot])return;if(storageUsed()>=storageCapacity()){toast('仓库已满，请先整理仓库再卸下装备');return}s.loadouts[op][slot]=null;changed()}
+function salvage(id){const i=s.inventory.find(x=>x.id===id);if(!i)return;if(i.locked){toast('装备已锁定，请先解锁');return}if(assignedTo(id)){toast('正在穿戴的装备不可拆解');return}const gained=salvageReward(i);s.inventory=s.inventory.filter(x=>x.id!==id);credit('parts',gained);addLog(`拆解 ${i.name} · +${gained} 零件`);$('modalRoot').innerHTML='';changed()}
+function forge(){const c={credits:180,alloy:45,parts:8};if(!pay(c)){toast('制造装备需要更多信用点、合金和零件');return}const item=makeItem(Math.random()<.2?1:0);toast(item?(s.inventory.some(i=>i.id===item.id)?`制造完成：${item.name}`:'制造完成，已按自动分解规则回收零件'):'仓库已满，无法收纳新装备');changed()}
 function research(k){const d=techDefs[k];if(!d||high()<d.unlock||researchLv(k)>=d.max)return;const c=researchCost(k);if(!pay(c)){toast('研发资源不足');return}s.tech[k]=(s.tech[k]||0)+1;addLog(`研究完成：${d.name} Lv.${s.tech[k]}`);toast('技术研究完成');changed()}
 function advance(auto=false){if(s.killsStage<6){if(!auto)toast('请先完成当前区域的 6 次目标清除');return}if(s.stage>=999)return;s.stage++;s.maxStage=Math.max(s.maxStage,s.stage);s.killsStage=0;s.enemyHp=enemyMaxHp();addLog(`已接入区域 ${s.stage}：${zone()[0]}`);if(!auto)toast(`新地区：${zone()[0]}`);changed()}
 function selectZone(n){if(!Number.isInteger(n)||n<1||n>high())return;if(n===s.stage)return;s.stage=n;s.killsStage=0;s.enemyHp=enemyMaxHp();addLog(`行动线路切换至区域 ${String(n).padStart(2,'0')}`);changed()}
@@ -221,15 +261,20 @@ function renderResource(){for(const k of ['Credits','Alloy','Energy','Data','Par
 function render(full=false){renderResource();if(!full)return;
  $('overviewLog').innerHTML=logHtml(6);$('battleLog').innerHTML=logHtml(7);
  const available=missions.filter(m=>!s.claimed[m.id]&&questProgress(m)>=m.need);const next=missions.find(m=>!s.claimed[m.id]);$('overviewTasks').innerHTML=`<div class="smallhead">// OPERATIONS / 可领取任务 ${available.length}</div>${next?`<div class="missionline"><b>${esc(next.name)}</b><span>${fmt(Math.min(next.need,questProgress(next)))} / ${next.need}</span></div>${progressHtml(questProgress(next),next.need)}<p>${esc(next.desc)} · 奖励 ${costText(next.reward)}</p>`:'<p>当前所有里程碑均已完成，可继续探索更深区域。</p>'}<button class="btn primary" data-goto="missions">任务与派遣 →</button>`;
- $('overviewLoot').innerHTML=`<div class="smallhead">// EQUIPMENT / 战利品</div><div class="summary-value">${s.inventory.length} <small>/ 60 件库存</small></div><p>累计获得 ${s.lootCount} 件装备 · 武器、防护装具与芯片提供不同属性。首领必定掉落装备。</p><button class="btn outline" data-goto="inventory">打开装备库 →</button>`;
+ $('overviewLoot').innerHTML=`<div class="smallhead">// EQUIPMENT / 战利品</div><div class="summary-value">${storageUsed()} <small>/ ${storageCapacity()} 格背包</small></div><p>累计获得 ${s.lootCount} 件装备 · 武器、防护装具与芯片提供不同属性。首领必定掉落装备。</p><button class="btn outline" data-goto="inventory">打开装备库 →</button>`;
  $('facilityCards').innerHTML=Object.entries(bld).map(([k,x])=>{const unlocked=high()>=x.unlock,c=buildCost(k),ok=afford(c);return `<article class="panel facility ${unlocked?'':'softlock'}"><div class="facicon">${facilitySvg(x.icon==='foundry'?'mine':x.icon==='workshop'?'trade':x.icon)}</div><div class="facbody"><div class="fachead"><h4>${x.name}</h4><span class="level">Lv.${s.buildings[k]}</span></div><p>${x.sub}${x.consume?' · 消耗 '+Object.entries(x.consume).map(([r,v])=>`${v} ${resourceNames[r]}/秒/级`).join(' '):''}</p><div class="facfoot"><span class="yield">+${prod(k).toFixed(2)} /秒</span><div><button class="btn ${ok&&unlocked?'primary':''}" data-build="${k}" ${unlocked?'':'disabled'}>${unlocked?'建设 +1':`区域 ${x.unlock} 解锁`}</button><div class="cost">${costText(c)}</div></div></div></div></article>`}).join('');
  $('productionInfo').innerHTML=Object.entries(bld).map(([k,d])=>`<div class="barrow"><b>${esc(d.name)}</b>${progressHtml(prod(k),Math.max(totalProd(),1))}<span class="numeric">${prod(k).toFixed(2)}/秒</span></div>`).join('');
  $('policyCards').innerHTML=[['normal','均衡运行','不消耗额外能源，基础生产与火力'],['industry','工业超频','额外消耗 0.35 能源/秒，非能源产线 +45%'],['combat','战斗超频','额外消耗 0.35 能源/秒，全队火力 +35%']].map(([k,n,desc])=>`<button class="choice ${s.policy===k?'selected':''}" data-policy="${k}"><b>${n}</b><small>${desc}</small></button>`).join('');
- $('operatorCards').innerHTML=Object.entries(opDefs).map(([k,d])=>{let owned=s.recruited.includes(k),o=s.ops[k],tc=trainCost(k);return `<article class="operator-card"><div class="portrait">${portraitSvg(k)}<span class="rank">${owned?'ACTIVE':'LOCKED'} / ${d.tag}</span></div><div class="opbody"><div class="opname"><h3>${d.name}</h3><span>Lv.${o.level}</span></div><div class="opdesc">${d.desc}</div><div class="opstat"><span>基础战力</span><b>${opPower(k).toFixed(1)} DPS</b></div>${progressHtml(o.xp,levelCap(o.level))}<div class="cost" style="text-align:left">EXP ${fmt(o.xp)} / ${fmt(levelCap(o.level))}</div>${owned?`<button class="btn ${s.focus===k?'primary':'outline'}" data-focus="${k}">${s.focus===k?'当前集训目标 · 经验 ×2':'设为集训目标'}</button><button class="btn outline" data-train="${k}">集中培训 · ${costText(tc)}</button>`:`<button class="btn primary" data-recruit="${k}">招募 · ${costText(d.price)}</button>`}</div></article>`}).join('');
+ $('operatorCards').innerHTML=Object.entries(opDefs).map(([k,d])=>{let owned=s.recruited.includes(k),o=s.ops[k],tc=trainCost(k);return `<article class="operator-card"><div class="portrait">${portraitSvg(k)}<span class="rank">${owned?'ACTIVE':'LOCKED'} / ${d.tag}</span></div><div class="opbody"><div class="opname"><h3>${d.name}</h3><span>Lv.${o.level}</span></div><div class="opdesc">${d.desc}</div><div class="opstat"><span>基础战力</span><b>${opPower(k).toFixed(1)} DPS</b></div>${progressHtml(o.xp,levelCap(o.level))}<div class="cost" style="text-align:left">EXP ${fmt(o.xp)} / ${fmt(levelCap(o.level))}</div>${owned?`<button class="btn outline" data-opgear="${k}">配装管理 · ${Object.values(s.loadouts[k]).filter(Boolean).length}/3 →</button><button class="btn ${s.focus===k?'primary':'outline'}" data-focus="${k}">${s.focus===k?'当前集训目标 · 经验 ×2':'设为集训目标'}</button><button class="btn outline" data-train="${k}">集中培训 · ${costText(tc)}</button>`:`<button class="btn primary" data-recruit="${k}">招募 · ${costText(d.price)}</button>`}</div></article>`}).join('');
  $('gearCard').innerHTML=`<h3>战术模块 / Mk.${s.gear}</h3><p>全队火力增益 +${s.gear*22}%。另可在战利品库装备随机掉落的武器和芯片。</p><button class="btn primary" data-gear="1">强化战术模块 · ${costText(gearCost())}</button>`;
- $('inventorySlots').innerHTML=Object.entries(slotDefs).map(([k,d])=>{const i=equippedItem(k);return `<div class="equipslot"><span>${d.name}</span><strong>${i?esc(i.name):'尚未装配'}</strong><small>${i?itemStat(i):'击败敌人以获得装备'}</small>${i?`<button class="btn outline" data-unequip="${k}">卸下</button>`:''}</div>`}).join('');
- $('inventoryCards').innerHTML=s.inventory.length?s.inventory.map(i=>`<article class="itemcard ${rarityDefs[i.rarity].class}"><span class="item-rank">${rarityDefs[i.rarity].name} / ${slotDefs[i.slot].name}</span><h4>${esc(i.name)}</h4><p>${itemStat(i)} · 来自区域 ${i.zone}</p><div class="item-actions"><button class="btn ${s.equipped[i.slot]===i.id?'outline':'primary'}" data-equip="${i.id}" ${s.equipped[i.slot]===i.id?'disabled':''}>${s.equipped[i.slot]===i.id?'正在使用':'装备'}</button><button class="btn outline" data-salvage="${i.id}" ${Object.values(s.equipped).includes(i.id)?'disabled':''}>拆解 +${salvageReward(i)} 零件</button></div></article>`).join(''):'<div class="empty-state">装备库目前为空。前往前线击败敌人，首领会保证掉落至少一件装备。</div>';
- $('inventoryCount').textContent=`${s.inventory.length} / 60`;$('autoEquip').checked=s.autoEquip;
+ $('equipmentOperators').innerHTML=s.recruited.map(k=>`<button class="op-picker ${s.selectedOp===k?'selected':''}" data-opselect="${k}">${esc(opDefs[k].name)} <span>${Object.values(s.loadouts[k]).filter(Boolean).length}/3</span></button>`).join('');
+ $('inventorySlots').innerHTML=Object.entries(slotDefs).map(([slot,d])=>{const i=equippedItem(s.selectedOp,slot);return `<div class="equipslot"><span>${d.name}</span><div class="slot-icon">${itemIcon(slot)}</div><strong>${i?esc(i.name):'空装备槽'}</strong><small>${i?itemStat(i):'选择下方装备，分配给 '+esc(opDefs[s.selectedOp].name)}</small>${i?`<div class="slot-buttons"><button class="btn outline" data-detail="${i.id}">详情</button><button class="btn outline" data-unequip="${slot}">卸下</button></div>`:''}</div>`}).join('');
+ const chosen=s.inventory.filter(i=>s.inventoryFilter==='all'||String(i.rarity)===s.inventoryFilter).sort((a,b)=>b.rarity-a.rarity||b.zone-a.zone||b.id-a.id);
+ $('inventoryCards').innerHTML=chosen.length?chosen.map(i=>{const owner=assignedTo(i.id),a=affixes(i),first=a[0],side=a.length-1;return `<button type="button" class="itemtile ${rarityDefs[i.rarity].class}" data-detail="${i.id}" aria-label="查看 ${esc(i.name)} 的详细词条"><div class="tile-top"><span class="rarity-mark">${rarityDefs[i.rarity].name.toUpperCase()}</span><span>${i.locked?'◆':''}${owner?'✓':''}</span></div><div class="tile-icon">${itemIcon(i.slot)}</div><div class="tile-bottom"><span class="tile-type">${slotDefs[i.slot].name} · A${String(i.zone).padStart(2,'0')}</span><strong title="${esc(i.name)}">${esc(i.name)}</strong><div class="tile-stats"><span>${first?statLabel(first.key,first.value):'暂无词条'}</span><span>${side>0?'副词条 ×'+side:'基础词条'}</span></div>${owner?`<span class="tile-owner">${esc(opDefs[owner].name)} · 已穿戴</span>`:''}</div></button>`}).join(''):'<div class="empty-state">暂无符合条件的装备。探索、击败首领或制造装备后会显示在这里。</div>';
+ $('inventoryCount').textContent=`${storageUsed()} / ${storageCapacity()}`;
+ $('storageExpand').textContent=s.storageLevel>=25?'容量已达上限':`扩建 +20 格 · ${costText(storageCost())}`;$('storageExpand').disabled=s.storageLevel>=25;
+ $('storageLevel').textContent=`等级 ${s.storageLevel} · 已装备 ${equippedIds().size} 件（不占仓库格）`;
+ $('autoEquip').checked=s.autoEquip;$('autoSalvage').value=s.autoSalvage;$('rarityFilter').value=s.inventoryFilter;
  $('researchCards').innerHTML=Object.entries(techDefs).map(([k,d])=>{const lv=researchLv(k),c=researchCost(k),lock=high()<d.unlock,max=lv>=d.max;return `<article class="panel tech-card ${lock?'softlock':''}"><div class="tech-head"><span>${d.category} / TECH</span><b>Lv.${lv} / ${d.max}</b></div><h3>${d.name}</h3><p>${d.desc}</p>${progressHtml(lv,d.max)}<button class="btn ${!lock&&!max&&afford(c)?'primary':''}" data-tech="${k}" ${lock||max?'disabled':''}>${lock?`区域 ${d.unlock} 解锁`:max?'研究已完成':`研究升级 · ${costText(c)}`}</button></article>`}).join('');
  $('missionCards').innerHTML=missions.map(m=>{const value=questProgress(m),claimed=!!s.claimed[m.id],done=value>=m.need;return `<article class="mission-card ${claimed?'mission-done':''}"><div class="missionline"><strong>${m.name}</strong><span>${claimed?'已领取':`${fmt(Math.min(m.need,value))} / ${m.need}`}</span></div><p>${m.desc} · 奖励 ${costText(m.reward)}</p>${progressHtml(value,m.need)}<button class="btn ${done&&!claimed?'primary':''}" data-claim="${m.id}" ${!done||claimed?'disabled':''}>${claimed?'奖励已领取':done?'领取奖励':'尚未达成'}</button></article>`}).join('');
  $('dispatchCards').innerHTML=Object.entries(dispatchDefs).map(([k,d])=>{const locked=high()<d.unlock;return `<article class="dispatch-card"><div class="missionline"><strong>${d.name}</strong><span>${d.sec} 秒</span></div><p>${d.detail}<br>消耗 ${costText(d.cost)}<br>获得 ${costText(d.reward)}</p><button class="btn ${!locked&&!s.dispatch?'primary':''}" data-dispatch="${k}" ${locked||s.dispatch?'disabled':''}>${locked?`区域 ${d.unlock} 解锁`:s.dispatch?'进行其他派遣中':'启动派遣'}</button></article>`}).join('');
@@ -238,17 +283,20 @@ function render(full=false){renderResource();if(!full)return;
  $('battleReport').innerHTML=`<div class="smallhead">// COMBAT READOUT / 交战数据</div><div class="btinfo"><span>活跃小队</span><strong>${s.recruited.length} / 3</strong></div><div class="btinfo"><span>基础 DPS</span><strong>${dps().toFixed(1)}</strong></div><div class="btinfo"><span>敌方持续威胁</span><strong>${enemyDmg().toFixed(2)} /秒</strong></div><div class="btinfo"><span>区域首领</span><strong>${enemyBoss()?'正在交战':'每第六只敌人出现'}</strong></div><div class="btinfo"><span>装备掉落几率</span><strong>${Math.round(chanceLoot()*100)}%（首领必掉）</strong></div><div class="btinfo"><span>历史最高区域</span><strong>${high()}</strong></div><p>小队会自动恢复耐久。护盾耗尽时撤退修复 10 秒，不会损失永久进度。敌人战斗与产线同时运行。</p>`;
  const can=high()>=5,earn=1+Math.floor(Math.max(0,high()-5)/2);$('prestigePanel').innerHTML=`<div class="smallhead">// PERMANENT DEVELOPMENT / 永久成长</div><div class="summary-value">${s.cores} <small>枚永久协议核心</small></div><p>每枚永久核心给予全队火力与全部资源生产 +15%。<br>当前倍率 ×${mult().toFixed(2)} · 历史最高区域 ${high()}。<br>达到区域 05 才可重启，本轮预计获得 ${can?earn:0} 枚核心。重启会重置当前轮次的装备、研究和资源。</p><button class="btn ${can?'primary':''}" id="rebootBtn" ${can?'':'disabled'}>执行协议重启</button>`;
 }
-function itemStat(i){return [i.atk?`攻击 +${i.atk}`:'',i.hp?`小队耐久 +${i.hp}`:'',i.loot?`掉率增幅 +${i.loot}%`:'' ].filter(Boolean).join(' · ')}
+function itemStat(i){return affixes(i).map(a=>statLabel(a.key,a.value)).join(' · ')}
+// 装备卡片只显示少量词条；查看详情后才显示全部属性、来源及词条描述。
+function itemIcon(slot){const paths={weapon:'<path d="M14 51L50 15l7 7-35 36-8-7ZM40 15l9-9 13 13-9 9M12 51l-6 11"/>',armor:'<path d="M12 17l24-12 24 12v18c-2 19-15 26-24 32-10-6-23-13-24-32V17Zm14 12 10-7 10 7v15L36 51 26 44V29Z"/>',module:'<rect x="15" y="15" width="42" height="42" rx="3"/><rect x="25" y="25" width="22" height="22"/><path d="M7 25h8M7 44h8M57 25h8M57 44h8M25 7v8M44 7v8M25 57v8M44 57v8"/>'};return `<svg viewBox="0 0 72 72" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">${paths[slot]}</svg>`}
+function openItem(id){const i=s.inventory.find(x=>x.id===id);if(!i)return;const owner=assignedTo(id),root=$('modalRoot');const a=affixes(i);const r=rarityDefs[i.rarity];root.innerHTML=`<div class="modalback"><div class="modal equipment-detail ${r.class}" role="dialog" aria-modal="true" aria-label="装备详情"><div class="detail-header"><div class="detail-large-icon">${itemIcon(i.slot)}</div><div><div class="detail-rank">${r.name.toUpperCase()} / ${slotDefs[i.slot].name}</div><h3>${esc(i.name)}</h3><p>回收区域 ${String(i.zone).padStart(2,'0')} · 装备编码 #${i.id} · ${owner?esc(opDefs[owner].name)+' 正在穿戴':'存放在仓库中'}</p></div></div><div class="detail-subtitle">装备词条与效果</div><div class="affix-list">${a.map(v=>`<div class="affix-row"><strong>${statLabel(v.key,v.value)}</strong><small>${affixInfo[v.key]}</small></div>`).join('')}</div><div class="detail-subtitle">选择穿戴干员</div><div class="detail-operators">${s.recruited.map(k=>`<button class="btn ${owner===k?'outline':'primary'}" data-equip="${i.id}" data-equip-op="${k}" ${owner===k?'disabled':''}>${esc(opDefs[k].name)}${owner===k?' · 已穿戴':''}</button>`).join('')}</div><div class="detail-footer"><button class="btn outline" data-lock="${i.id}">${i.locked?'取消锁定':'锁定保护'}</button><button class="btn alert" data-salvage="${i.id}" ${owner||i.locked?'disabled':''}>拆解 +${salvageReward(i)} 零件</button><button class="btn outline" data-close-detail="1">关闭</button></div></div></div>`;root.querySelector('.modalback').onclick=e=>{if(e.target===root.querySelector('.modalback'))root.innerHTML=''}}
 // 切页路由：所有导航均不刷新页面，手机可以左右滑动顶栏查看全部标签。
 function go(t){if(!tabMeta[t]||!$(t))return;tab=t;document.querySelectorAll('.page').forEach(e=>e.classList.toggle('hidden',e.id!==t));document.querySelectorAll('.navbtn').forEach(e=>e.classList.toggle('active',e.dataset.tab===t));$('pageTitle').textContent=tabMeta[t][0];$('breadcrumb').textContent=tabMeta[t][0];$('pageSubtitle').textContent=tabMeta[t][1];render(true);window.scrollTo({top:0,behavior:'instant'});}
 function animateAttack(){const a=$('heroFig'),e=$('enemyFig'),b=$('beam');for(const x of [a,e,b]){x.classList.remove('hit','attack','flash');void x.offsetWidth}a.classList.add('attack');e.classList.add('hit');b.classList.add('flash')}
-function modal(title,value,importing){const root=$('modalRoot');root.innerHTML=`<div class="modalback"><div class="modal" role="dialog" aria-modal="true"><h3>${title}</h3><p>${importing?'粘贴由旧游戏或本游戏导出的 JSON 存档。':'以下文本为本机存档。更换浏览器或设备之前请保存副本。'}</p><textarea id="saveta" spellcheck="false" aria-label="存档文本"></textarea><div class="modalactions"><button class="btn outline" id="closeModal">关闭</button><button class="btn primary" id="modalSubmit">${importing?'确认导入':'复制存档'}</button></div></div></div>`;$('saveta').value=value||'';$('closeModal').onclick=()=>root.innerHTML='';$('modalSubmit').onclick=async()=>{if(importing){try{const obj=JSON.parse($('saveta').value);if(!obj||![1,2].includes(obj.version)||!Number.isFinite(obj.credits)||!obj.buildings||!obj.ops)throw Error('invalid');s=hydrate(obj);s.enemyHp=enemyMaxHp();s.lastSave=Date.now();root.innerHTML='';addLog('外部存档导入成功');changed();toast('导入成功')}catch(e){toast('导入失败，请检查 JSON 是否完整')}}else{try{await navigator.clipboard.writeText($('saveta').value);toast('已复制文本')}catch(e){$('saveta').select();toast('请手动复制选中的内容')}}};root.querySelector('.modalback').onclick=e=>{if(e.target===root.querySelector('.modalback'))root.innerHTML=''}}
+function modal(title,value,importing){const root=$('modalRoot');root.innerHTML=`<div class="modalback"><div class="modal" role="dialog" aria-modal="true"><h3>${title}</h3><p>${importing?'粘贴由旧游戏或本游戏导出的 JSON 存档。':'以下文本为本机存档。更换浏览器或设备之前请保存副本。'}</p><textarea id="saveta" spellcheck="false" aria-label="存档文本"></textarea><div class="modalactions"><button class="btn outline" id="closeModal">关闭</button><button class="btn primary" id="modalSubmit">${importing?'确认导入':'复制存档'}</button></div></div></div>`;$('saveta').value=value||'';$('closeModal').onclick=()=>root.innerHTML='';$('modalSubmit').onclick=async()=>{if(importing){try{const obj=JSON.parse($('saveta').value);if(!obj||![1,2,3].includes(obj.version)||!Number.isFinite(obj.credits)||!obj.buildings||!obj.ops)throw Error('invalid');s=hydrate(obj);s.enemyHp=enemyMaxHp();s.lastSave=Date.now();root.innerHTML='';addLog('外部存档导入成功');changed();toast('导入成功')}catch(e){toast('导入失败，请检查 JSON 是否完整')}}else{try{await navigator.clipboard.writeText($('saveta').value);toast('已复制文本')}catch(e){$('saveta').select();toast('请手动复制选中的内容')}}};root.querySelector('.modalback').onclick=e=>{if(e.target===root.querySelector('.modalback'))root.innerHTML=''}}
 function init(){load();render(true);$('runtimeNotice').hidden=true;document.documentElement.classList.add('app-ready');
  // 事件委托：动态卡片重绘后，按钮不需要重新绑定事件。
  document.addEventListener('click',e=>{const b=e.target.closest('[data-tab],button');if(!b||b.disabled)return;let k;
- if(k=b.dataset.tab){e.preventDefault();go(k)}else if(k=b.dataset.goto)go(k);else if(k=b.dataset.build)build(k);else if(k=b.dataset.recruit)recruit(k);else if(k=b.dataset.train)train(k);else if(k=b.dataset.focus)setFocus(k);else if(k=b.dataset.equip)equip(Number(k));else if(k=b.dataset.salvage)salvage(Number(k));else if(k=b.dataset.unequip)unequip(k);else if(k=b.dataset.tech)research(k);else if(k=b.dataset.claim)claimQuest(k);else if(k=b.dataset.dispatch)dispatch(k);else if(k=b.dataset.policy)setPolicy(k);else if(k=b.dataset.zone)selectZone(Number(k));else if(b.dataset.gear)strengthen();else if(b.id==='rebootBtn')reboot();else if(b.id==='forgeBtn')forge();});
+ if(k=b.dataset.tab){e.preventDefault();go(k)}else if(k=b.dataset.goto)go(k);else if(k=b.dataset.opselect)selectOp(k);else if(k=b.dataset.opgear){s.selectedOp=k;go('inventory')}else if(k=b.dataset.detail)openItem(Number(k));else if(k=b.dataset.lock)toggleLock(Number(k));else if(b.dataset.closeDetail)$('modalRoot').innerHTML='';else if(k=b.dataset.build)build(k);else if(k=b.dataset.recruit)recruit(k);else if(k=b.dataset.train)train(k);else if(k=b.dataset.focus)setFocus(k);else if(k=b.dataset.equip){equip(Number(k),b.dataset.equipOp||s.selectedOp);$('modalRoot').innerHTML=''}else if(k=b.dataset.salvage)salvage(Number(k));else if(k=b.dataset.unequip)unequip(k);else if(k=b.dataset.tech)research(k);else if(k=b.dataset.claim)claimQuest(k);else if(k=b.dataset.dispatch)dispatch(k);else if(k=b.dataset.policy)setPolicy(k);else if(k=b.dataset.zone)selectZone(Number(k));else if(b.dataset.gear)strengthen();else if(b.id==='rebootBtn')reboot();else if(b.id==='forgeBtn')forge();else if(b.id==='storageExpand')upgradeStorage();});
  $('goalAction').onclick=()=>go('battle');$('advanceBtn').onclick=()=>advance();$('saveNow').onclick=()=>toast(save()?'存档已保存':'本机无法写入存档');$('exportSave').onclick=()=>{save();modal('导出存档',JSON.stringify(s),false)};$('importSave').onclick=()=>modal('导入存档','',true);$('hardReset').onclick=reset;
- $('autoAdvance').onchange=e=>{if(researchLv('autonomy')){s.autoAdvance=e.target.checked;changed()}};$('autoEquip').onchange=e=>{s.autoEquip=e.target.checked;changed()};
+ $('autoAdvance').onchange=e=>{if(researchLv('autonomy')){s.autoAdvance=e.target.checked;changed()}};$('autoEquip').onchange=e=>{s.autoEquip=e.target.checked;if(s.autoEquip)autoEquipBest();changed()};$('autoSalvage').onchange=e=>setAutoSalvage(e.target.value);$('rarityFilter').onchange=e=>setInventoryFilter(e.target.value);
  document.addEventListener('visibilitychange',()=>{if(document.hidden)save();else{const now=Date.now();const off=Math.min(MAX_OFFLINE,Math.max(0,(now-lastTick)/1000));if(off>3)calculateOffline(off);lastTick=now;changed()}});window.addEventListener('pagehide',save);
  setInterval(()=>{if(document.hidden)return;const now=Date.now(),dt=Math.max(0,Math.min(.5,(now-lastTick)/1000));lastTick=now;const before=s.totalKills;tick(dt);render(false);if(before!==s.totalKills&&tab==='battle')animateAttack();if(now-lastFull>1200){lastFull=now;render(true)}if(now-lastSave>10000){lastSave=now;save()}},200);
 }

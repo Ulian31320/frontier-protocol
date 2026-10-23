@@ -70,8 +70,17 @@ def test_device(browser, mobile=False):
     page.locator('.navbtn[data-tab="inventory"]').click()
     page.locator('#forgeBtn').click()
     assert page.evaluate('s.inventory.length') > 0, '点击制造按钮无效'
-    page.locator('button[data-equip]').first.click()
-    assert page.evaluate('Object.values(s.equipped).some(Boolean)'), '点击装备按钮无效'
+    page.locator('button[data-detail]').first.click()
+    assert page.locator('.equipment-detail').is_visible(), '装备详情未打开'
+    page.locator('.equipment-detail button[data-equip]').first.click()
+    assert page.evaluate('Object.values(s.loadouts.lin).some(Boolean)'), '点击装备按钮无效'
+    page.locator('#storageExpand').click()
+    assert page.evaluate('s.storageLevel') == 1, '仓库扩建按钮无效'
+    page.locator('#autoSalvage').select_option('common')
+    assert page.evaluate('s.autoSalvage') == 'common', '自动分解规则无效'
+    page.locator('#rarityFilter').select_option('2')
+    assert page.evaluate('s.inventoryFilter') == '2', '稀有度筛选无效'
+    page.locator('#rarityFilter').select_option('all')
     page.locator('.navbtn[data-tab="protocol"]').click()
     page.locator('#saveNow').click()
     assert page.evaluate('!!localStorage.getItem(SAVEKEY)'), '保存功能无效'

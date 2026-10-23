@@ -10,7 +10,7 @@
 <aside class="sidebar">
   <div class="brand"><div class="brandmark"><div class="emblem">◇</div><div><div class="brandtop">边境协议</div><div class="brandbottom">FRONTIER PROTOCOL</div></div></div><div class="brandtag"><span class="dot"></span>OUTPOST SYSTEM ONLINE</div></div>
   <nav class="nav" id="nav"><span class="navhead">CONTROL / 控制终端</span><a href="#overview" class="navbtn active" data-tab="overview"><span class="navicon">▦</span> 总控概览</a><a href="#factory" class="navbtn" data-tab="factory"><span class="navicon">▤</span> 基地建设</a><a href="#battle" class="navbtn" data-tab="battle"><span class="navicon">⌁</span> 前线探索</a><a href="#operators" class="navbtn" data-tab="operators"><span class="navicon">◇</span> 干员档案</a><a href="#inventory" class="navbtn" data-tab="inventory"><span class="navicon">▱</span> 装备仓库</a><a href="#research" class="navbtn" data-tab="research"><span class="navicon">⌬</span> 技术研发</a><a href="#missions" class="navbtn" data-tab="missions"><span class="navicon">◎</span> 任务终端</a><a href="#protocol" class="navbtn" data-tab="protocol"><span class="navicon">⟳</span> 协议记录</a></nav>
-  <div class="sidebottom">地区状态 <b>自动巡检中</b><br>终端时间 <b id="clock">--:--:--</b><br>存档状态 <b id="saveStatus">本地自动保存</b><div class="version">BUILD 0.2.0 / EXPLORATION</div></div>
+  <div class="sidebottom">地区状态 <b>自动巡检中</b><br>终端时间 <b id="clock">--:--:--</b><br>存档状态 <b id="saveStatus">本地自动保存</b><div class="version">BUILD 0.3.0 / EQUIPMENT</div></div>
 </aside>
 <main class="main">
 <div class="runtime-notice" id="runtimeNotice" role="alert">
@@ -45,11 +45,14 @@
 
   <section id="inventory" class="page hidden">
     <div class="banner">RECOVERED ASSETS // 击败敌人可获得带随机属性的装备；区域首领必定掉落。拆解不需要的装备换取零件，或者使用零件制造新装备。</div>
-    <div class="sectionhead"><h3>当前装配</h3><span class="sub">每个槽位可装备一件，属性作用于整个小队</span></div><div class="equipment-grid" id="inventorySlots"></div>
+    <div class="sectionhead"><h3>角色配装</h3><span class="sub">每位队员独立拥有武器、防护装具和战术芯片</span></div>
+    <div class="op-picker-row" id="equipmentOperators" aria-label="选择配装队员"></div><div class="equipment-grid" id="inventorySlots"></div>
     <div class="sectionhead"><h3>战地制造</h3><span class="sub">花费 180 信用点 · 45 合金 · 8 零件</span></div>
     <div class="panel settings craftline"><div><strong>装备测试台 / FIELD ASSEMBLY</strong><p>独立制造一件装备。高级区域的制造成品属性更强。</p></div><button class="btn primary" id="forgeBtn">制造一件随机装备</button></div>
-    <div class="sectionhead"><h3>回收清单</h3><span class="sub">库存 <span id="inventoryCount">0 / 60</span></span></div>
-    <div class="panel settings"><label class="toggle"><input type="checkbox" id="autoEquip"><span>自动装备评分更高的新战利品</span></label><p>装备会保留在仓库里，可随时手动换装。正在使用的装备不能直接拆解。</p></div>
+    <div class="sectionhead"><h3>装备仓库</h3><span class="sub">未穿戴库存 <span id="inventoryCount">0 / 60</span></span></div>
+    <div class="panel settings warehouse-control"><div><strong>仓库扩建 / STORAGE UPGRADE</strong><p id="storageLevel">等级 0 · 已装备的物品不占仓库格</p></div><button class="btn primary" id="storageExpand">扩建 +20 格</button></div>
+    <div class="panel settings warehouse-control"><label class="toggle"><input type="checkbox" id="autoEquip"><span>自动为每名队员分配评分更高的装备</span></label><label class="field-label" for="autoSalvage">自动分解规则</label><select id="autoSalvage" class="select-control"><option value="none">关闭 · 全部保留</option><option value="common">自动分解标准装备</option><option value="rare">自动分解标准及精良装备</option></select><p>只分解未穿戴、未锁定的装备；卓越装备不会被自动分解。仓库满时不再暗中替换高品质装备。</p></div>
+    <div class="sectionhead"><h3>物资列表</h3><label class="field-label" for="rarityFilter">筛选稀有度 <select id="rarityFilter" class="select-control"><option value="all">全部</option><option value="0">标准</option><option value="1">精良</option><option value="2">卓越</option></select></label></div>
     <div class="loot-grid" id="inventoryCards"></div>
   </section>
   <section id="research" class="page hidden">
@@ -62,7 +65,7 @@
     <div class="sectionhead"><h3>后勤派遣</h3><span class="sub">同一时间只能执行一项派遣</span></div><div class="panel settings dispatch-status">派遣进度：<strong id="dispatchEta">暂无派遣</strong></div><div class="dispatch-grid" id="dispatchCards"></div>
   </section>
   <section id="protocol" class="page hidden"><div class="banner">PROTOCOL REBOOT // 区域 05 解锁永久协议核心。重启会重置本轮资源、角色、装备及科研，保留核心提供的永久倍率。</div><div class="sectionhead"><h3>协议档案</h3><span class="sub">永久增益 / PRESTIGE</span></div><div class="panel settings" id="prestigePanel"></div><div class="sectionhead"><h3>存档管理</h3><span class="sub">数据保存在当前浏览器</span></div><div class="panel settings"><p>本游戏无需账户和服务器。浏览器会自动存档，你也可以将存档文本复制到其他设备后导入。不同设备之间不会自动同步。</p><div class="saveactions"><button class="btn" id="saveNow">立即存档</button><button class="btn outline" id="exportSave">导出存档</button><button class="btn outline" id="importSave">导入存档</button><button class="btn alert" id="hardReset">清除进度</button></div></div></section>
-  <footer class="foot">FRONTIER PROTOCOL · ORIGINAL IDLE RPG · V0.2.0</footer>
+  <footer class="foot">FRONTIER PROTOCOL · ORIGINAL IDLE RPG · V0.3.0</footer>
 </main>
 </div>
 <div class="toast" id="toast" aria-live="polite"></div><div id="modalRoot"></div>
