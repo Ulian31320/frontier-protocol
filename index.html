@@ -10,7 +10,7 @@
 <aside class="sidebar">
   <div class="brand"><div class="brandmark"><div class="emblem">◇</div><div><div class="brandtop">边境协议</div><div class="brandbottom">FRONTIER PROTOCOL</div></div></div><div class="brandtag"><span class="dot"></span>OUTPOST SYSTEM ONLINE</div></div>
   <nav class="nav" id="nav"><span class="navhead">CONTROL / 控制终端</span><a href="#overview" class="navbtn active" data-tab="overview"><span class="navicon">▦</span> 总控概览</a><a href="#factory" class="navbtn" data-tab="factory"><span class="navicon">▤</span> 基地建设</a><a href="#battle" class="navbtn" data-tab="battle"><span class="navicon">⌁</span> 前线探索</a><a href="#operators" class="navbtn" data-tab="operators"><span class="navicon">◇</span> 干员档案</a><a href="#inventory" class="navbtn" data-tab="inventory"><span class="navicon">▱</span> 装备仓库</a><a href="#research" class="navbtn" data-tab="research"><span class="navicon">⌬</span> 技术研发</a><a href="#missions" class="navbtn" data-tab="missions"><span class="navicon">◎</span> 任务终端</a><a href="#protocol" class="navbtn" data-tab="protocol"><span class="navicon">⟳</span> 协议记录</a></nav>
-  <div class="sidebottom">地区状态 <b>自动巡检中</b><br>终端时间 <b id="clock">--:--:--</b><br>存档状态 <b id="saveStatus">本地自动保存</b><div class="version">BUILD 0.4.0 / FRONTIER</div></div>
+  <div class="sidebottom">地区状态 <b>自动巡检中</b><br>终端时间 <b id="clock">--:--:--</b><br>存档状态 <b id="saveStatus">本地自动保存</b><div class="version">BUILD 0.6.1 / UI FIX</div></div>
 </aside>
 <main class="main">
 <div class="runtime-notice" id="runtimeNotice" role="alert">
@@ -61,11 +61,21 @@
   </section>
   <section id="missions" class="page hidden">
     <div class="banner">FIELD COMMISSIONS // 完成里程碑领取一次性资源奖励；后勤派遣可以反复执行，即使离开游戏也会在计时结束后结算。</div>
-    <div class="sectionhead"><h3>里程碑委托</h3><span class="sub">达成目标后手动领取奖励</span></div><div class="mission-grid" id="missionCards"></div>
-    <div class="sectionhead"><h3>后勤派遣</h3><span class="sub">同一时间只能执行一项派遣</span></div><div class="panel settings dispatch-status">派遣进度：<strong id="dispatchEta">暂无派遣</strong></div><div class="dispatch-grid" id="dispatchCards"></div>
+    <div class="mission-mode-switch" role="tablist" aria-label="任务分类">
+      <button type="button" class="mission-mode active" data-mission-view="milestones" role="tab" aria-selected="true" aria-controls="missionMilestones">里程碑 <span class="mission-ready-count" id="milestoneReady">0</span></button>
+      <button type="button" class="mission-mode" data-mission-view="dispatches" role="tab" aria-selected="false" aria-controls="missionDispatches">后勤派遣 <span class="mission-mode-hint">可重复执行</span></button>
+    </div>
+    <div class="mission-subpage" id="missionMilestones" role="tabpanel">
+      <div class="sectionhead mission-subhead"><div><h3>里程碑委托</h3><span class="sub">达成目标后领取一次性奖励</span></div><button type="button" class="btn primary" id="claimAllBtn" disabled>没有可领取的奖励</button></div>
+      <div class="mission-grid" id="missionCards"></div>
+    </div>
+    <div class="mission-subpage" id="missionDispatches" role="tabpanel" hidden>
+      <div class="sectionhead"><h3>后勤派遣</h3><span class="sub">同一时间只能执行一项派遣</span></div>
+      <div class="panel settings dispatch-status">派遣进度：<strong id="dispatchEta">暂无派遣</strong></div><div class="dispatch-grid" id="dispatchCards"></div>
+    </div>
   </section>
   <section id="protocol" class="page hidden"><div class="banner">PROTOCOL REBOOT // 区域 05 解锁永久协议核心。重启会重置本轮资源、角色、装备及科研，保留核心提供的永久倍率。</div><div class="sectionhead"><h3>协议档案</h3><span class="sub">永久增益 / PRESTIGE</span></div><div class="panel settings" id="prestigePanel"></div><div class="sectionhead"><h3>存档管理</h3><span class="sub">数据保存在当前浏览器</span></div><div class="panel settings"><p>本游戏无需账户和服务器。浏览器会自动存档，你也可以将存档文本复制到其他设备后导入。不同设备之间不会自动同步。</p><div class="saveactions"><button class="btn" id="saveNow">立即存档</button><button class="btn outline" id="exportSave">导出存档</button><button class="btn outline" id="importSave">导入存档</button><button class="btn alert" id="hardReset">清除进度</button></div></div></section>
-  <footer class="foot">FRONTIER PROTOCOL · ORIGINAL IDLE RPG · V0.6.0</footer>
+  <footer class="foot">FRONTIER PROTOCOL · ORIGINAL IDLE RPG · V0.6.1</footer>
 </main>
 </div>
 <div class="toast" id="toast" aria-live="polite"></div><div id="modalRoot"></div>

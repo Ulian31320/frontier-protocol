@@ -120,7 +120,7 @@ function fresh(cores=0){return {version:5,credits:340,alloy:50,energy:34,data:0,
  gear:0,cores,stage:1,maxStage:1,killsStage:0,totalKills:0,totalEarned:0,totalAlloy:50,totalParts:0,
  lootCount:0,enemyHp:0,squadHp:100,retreat:0,tech:{},claimed:{},inventory:[],loadouts:Object.fromEntries(Object.keys(opDefs).map(k=>[k,emptyLoadout()])),storageLevel:0,autoSalvage:'none',uid:1, squad:['lin'],mapChapter:0,legacyRoster:{ops:{},recruited:[],loadouts:{}},
  focus:'lin',selectedOp:'lin',inventoryFilter:'all',policy:'normal',autoAdvance:false,autoEquip:false,dispatch:null,logs:[],created:Date.now(),lastSave:Date.now()};}
-let s=fresh();let tab='overview';let lastTick=Date.now(),lastSave=Date.now(),lastFull=0,toastTimer=0,completedDispatches=0;
+let s=fresh();let tab='overview';let missionView='milestones';let lastTick=Date.now(),lastSave=Date.now(),lastFull=0,toastTimer=0,completedDispatches=0;
 const zone=()=>zoneAt(s.stage);
 const high=()=>s.maxStage||s.stage;
 // 每 5 区形成一个章节；深层区域继续扩展章节而非重复第 10 区。
@@ -304,6 +304,28 @@ function advance(auto=false){const need=regionGoal(s.stage);if(s.killsStage<need
 function selectZone(n){if(!Number.isInteger(n)||n<1||n>high())return;if(n===s.stage)return;s.stage=n;s.mapChapter=chapterIndex(n);s.killsStage=0;s.enemyHp=enemyMaxHp();addLog(`行动线路切换至区域 ${String(n).padStart(2,'0')}`);changed()}
 function questProgress(m){switch(m.key){case 'kills':return s.totalKills;case 'buildings':return Object.values(s.buildings).reduce((a,b)=>a+b,0);case 'zone':return high();case 'tech':return Object.values(s.tech).reduce((a,b)=>a+b,0);case 'loot':return s.lootCount;case 'squad':return s.recruited.length;case 'parts':return s.totalParts;default:return 0}}
 function claimQuest(k){const m=missions.find(x=>x.id===k);if(!m||s.claimed[k]||questProgress(m)<m.need)return;s.claimed[k]=true;gainRewards(m.reward);addLog(`任务「${m.name}」已领取奖励`);toast('里程碑奖励已领取');changed()}
+// 一键领取：只处理当前已达成且未领取的里程碑，统一存档/渲染一次。
+function claimAllQuests(){
+ const ready=missions.filter(m=>!s.claimed[m.id]&&questProgress(m)>=m.need);
+ if(!ready.length){toast('目前没有可领取的里程碑奖励');return}
+ for(const m of ready){s.claimed[m.id]=true;gainRewards(m.reward)}
+ addLog(`批量领取 ${ready.length} 项里程碑奖励`);
+ toast(`已领取 ${ready.length} 项里程碑奖励`);
+ changed();
+}
+// 里程碑与派遣采用任务终端内的独立切换页，不改动派遣时间及奖励。
+function showMissionView(view){
+ if(view!=='milestones'&&view!=='dispatches')return;
+ missionView=view;
+ $('missionMilestones').hidden=view!=='milestones';
+ $('missionDispatches').hidden=view!=='dispatches';
+ document.querySelectorAll('[data-mission-view]').forEach(b=>{
+   const active=b.dataset.missionView===view;
+   b.classList.toggle('active',active);
+   b.setAttribute('aria-selected',String(active));
+   b.tabIndex=active?0:-1;
+ });
+}
 function dispatch(k){const d=dispatchDefs[k];if(!d||s.dispatch||high()<d.unlock)return;if(!pay(d.cost)){toast('派遣物资不足');return}s.dispatch={id:k,end:Date.now()+d.sec*1000};addLog(`后勤派遣已出发：${d.name}`);changed()}
 function setPolicy(k){if(!['normal','industry','combat'].includes(k))return;s.policy=k;toast(`已切换至${{normal:'均衡运行',industry:'工业超频',combat:'战斗超频'}[k]}`);changed()}
 function setFocus(k){if(!s.recruited.includes(k))return;s.focus=k;addLog(`集训重点调整为 ${opDefs[k].name}`);changed()}
@@ -323,7 +345,11 @@ function renderResource(){for(const k of ['Credits','Alloy','Energy','Data','Par
  $('clock').textContent=new Date().toLocaleTimeString('zh-CN',{hour12:false});if(s.dispatch)$('dispatchEta').textContent=`${dispatchDefs[s.dispatch.id].name} · ${Math.ceil(Math.max(0,s.dispatch.end-Date.now())/1000)} 秒`;else $('dispatchEta').textContent='当前没有派遣任务';}
 function render(full=false){renderResource();if(!full)return;
  $('overviewLog').innerHTML=logHtml(6);$('battleLog').innerHTML=logHtml(7);
- const available=missions.filter(m=>!s.claimed[m.id]&&questProgress(m)>=m.need);const next=missions.find(m=>!s.claimed[m.id]);$('overviewTasks').innerHTML=`<div class="smallhead">// OPERATIONS / 可领取任务 ${available.length}</div>${next?`<div class="missionline"><b>${esc(next.name)}</b><span>${fmt(Math.min(next.need,questProgress(next)))} / ${next.need}</span></div>${progressHtml(questProgress(next),next.need)}<p>${esc(next.desc)} · 奖励 ${costText(next.reward)}</p>`:'<p>当前所有里程碑均已完成，可继续探索更深区域。</p>'}<button class="btn primary" data-goto="missions">任务与派遣 →</button>`;
+ const available=missions.filter(m=>!s.claimed[m.id]&&questProgress(m)>=m.need);
+ $('milestoneReady').textContent=String(available.length);
+ $('claimAllBtn').disabled=!available.length;
+ $('claimAllBtn').textContent=available.length?`一键领取 ${available.length} 项奖励`:'没有可领取的奖励';
+ const next=missions.find(m=>!s.claimed[m.id]);$('overviewTasks').innerHTML=`<div class="smallhead">// OPERATIONS / 可领取任务 ${available.length}</div>${next?`<div class="missionline"><b>${esc(next.name)}</b><span>${fmt(Math.min(next.need,questProgress(next)))} / ${next.need}</span></div>${progressHtml(questProgress(next),next.need)}<p>${esc(next.desc)} · 奖励 ${costText(next.reward)}</p>`:'<p>当前所有里程碑均已完成，可继续探索更深区域。</p>'}<button class="btn primary" data-goto="missions">任务与派遣 →</button>`;
  $('overviewLoot').innerHTML=`<div class="smallhead">// EQUIPMENT / 战利品</div><div class="summary-value">${storageUsed()} <small>/ ${storageCapacity()} 格背包</small></div><p>累计获得 ${s.lootCount} 件装备 · 武器、防护装具与芯片提供不同属性。首领必定掉落装备。</p><button class="btn outline" data-goto="inventory">打开装备库 →</button>`;
  $('facilityCards').innerHTML=Object.entries(bld).map(([k,x])=>{const unlocked=high()>=x.unlock,c=buildCost(k),ok=afford(c);return `<article class="panel facility ${unlocked?'':'softlock'}"><div class="facicon">${facilitySvg(x.icon==='foundry'?'mine':x.icon==='workshop'?'trade':x.icon)}</div><div class="facbody"><div class="fachead"><h4>${x.name}</h4><span class="level">Lv.${s.buildings[k]}</span></div><p>${x.sub}${x.consume?' · 消耗 '+Object.entries(x.consume).map(([r,v])=>`${v} ${resourceNames[r]}/秒/级`).join(' '):''}</p><div class="facfoot"><span class="yield">+${prod(k).toFixed(2)} /秒</span><div><button class="btn ${ok&&unlocked?'primary':''}" data-build="${k}" ${unlocked?'':'disabled'}>${unlocked?'建设 +1':`区域 ${x.unlock} 解锁`}</button><div class="cost">${costText(c)}</div></div></div></div></article>`}).join('');
  $('productionInfo').innerHTML=Object.entries(bld).map(([k,d])=>`<div class="barrow"><b>${esc(d.name)}</b>${progressHtml(prod(k),Math.max(totalProd(),1))}<span class="numeric">${prod(k).toFixed(2)}/秒</span></div>`).join('');
@@ -359,10 +385,10 @@ function openItem(id){const i=s.inventory.find(x=>x.id===id);if(!i)return;const 
 function go(t){if(!tabMeta[t]||!$(t))return;tab=t;document.querySelectorAll('.page').forEach(e=>e.classList.toggle('hidden',e.id!==t));document.querySelectorAll('.navbtn').forEach(e=>e.classList.toggle('active',e.dataset.tab===t));$('pageTitle').textContent=tabMeta[t][0];$('breadcrumb').textContent=tabMeta[t][0];$('pageSubtitle').textContent=tabMeta[t][1];render(true);window.scrollTo({top:0,behavior:'instant'});}
 function animateAttack(){const a=$('heroFig'),e=$('enemyFig'),b=$('beam');for(const x of [a,e,b]){x.classList.remove('hit','attack','flash');void x.offsetWidth}a.classList.add('attack');e.classList.add('hit');b.classList.add('flash')}
 function modal(title,value,importing){const root=$('modalRoot');root.innerHTML=`<div class="modalback"><div class="modal" role="dialog" aria-modal="true"><h3>${title}</h3><p>${importing?'粘贴由旧游戏或本游戏导出的 JSON 存档。':'以下文本为本机存档。更换浏览器或设备之前请保存副本。'}</p><textarea id="saveta" spellcheck="false" aria-label="存档文本"></textarea><div class="modalactions"><button class="btn outline" id="closeModal">关闭</button><button class="btn primary" id="modalSubmit">${importing?'确认导入':'复制存档'}</button></div></div></div>`;$('saveta').value=value||'';$('closeModal').onclick=()=>root.innerHTML='';$('modalSubmit').onclick=async()=>{if(importing){try{const obj=JSON.parse($('saveta').value);if(!obj||![1,2,3,4,5].includes(obj.version)||!Number.isFinite(obj.credits)||!obj.buildings||!obj.ops)throw Error('invalid');s=hydrate(obj);s.enemyHp=enemyMaxHp();s.lastSave=Date.now();root.innerHTML='';addLog('外部存档导入成功');changed();toast('导入成功')}catch(e){toast('导入失败，请检查 JSON 是否完整')}}else{try{await navigator.clipboard.writeText($('saveta').value);toast('已复制文本')}catch(e){$('saveta').select();toast('请手动复制选中的内容')}}};root.querySelector('.modalback').onclick=e=>{if(e.target===root.querySelector('.modalback'))root.innerHTML=''}}
-function init(){load();render(true);$('runtimeNotice').hidden=true;document.documentElement.classList.add('app-ready');
+function init(){load();render(true);showMissionView(missionView);$('runtimeNotice').hidden=true;document.documentElement.classList.add('app-ready');
  // 事件委托：动态卡片重绘后，按钮不需要重新绑定事件。
  document.addEventListener('click',e=>{const b=e.target.closest('[data-tab],button');if(!b||b.disabled)return;let k;
- if(k=b.dataset.tab){e.preventDefault();go(k)}else if(k=b.dataset.goto)go(k);else if(k=b.dataset.opselect)selectOp(k);else if(k=b.dataset.squad)toggleSquad(k);else if(b.dataset.mapChapter!==undefined)chooseMapChapter(Number(b.dataset.mapChapter));else if(k=b.dataset.opgear){s.selectedOp=k;go('inventory')}else if(k=b.dataset.detail)openItem(Number(k));else if(k=b.dataset.lock)toggleLock(Number(k));else if(b.dataset.closeDetail)$('modalRoot').innerHTML='';else if(k=b.dataset.build)build(k);else if(k=b.dataset.recruit)recruit(k);else if(k=b.dataset.train)train(k);else if(k=b.dataset.focus)setFocus(k);else if(k=b.dataset.equip){equip(Number(k),b.dataset.equipOp||s.selectedOp);$('modalRoot').innerHTML=''}else if(k=b.dataset.salvage)salvage(Number(k));else if(k=b.dataset.unequip)unequip(k);else if(k=b.dataset.tech)research(k);else if(k=b.dataset.claim)claimQuest(k);else if(k=b.dataset.dispatch)dispatch(k);else if(k=b.dataset.policy)setPolicy(k);else if(k=b.dataset.zone)selectZone(Number(k));else if(b.dataset.gear)strengthen();else if(b.id==='rebootBtn')reboot();else if(b.id==='forgeBtn')forge();else if(b.id==='storageExpand')upgradeStorage();});
+ if(k=b.dataset.tab){e.preventDefault();go(k)}else if(k=b.dataset.goto)go(k);else if(k=b.dataset.opselect)selectOp(k);else if(k=b.dataset.squad)toggleSquad(k);else if(b.dataset.mapChapter!==undefined)chooseMapChapter(Number(b.dataset.mapChapter));else if(k=b.dataset.opgear){s.selectedOp=k;go('inventory')}else if(k=b.dataset.detail)openItem(Number(k));else if(k=b.dataset.lock)toggleLock(Number(k));else if(b.dataset.closeDetail)$('modalRoot').innerHTML='';else if(k=b.dataset.build)build(k);else if(k=b.dataset.recruit)recruit(k);else if(k=b.dataset.train)train(k);else if(k=b.dataset.focus)setFocus(k);else if(k=b.dataset.equip){equip(Number(k),b.dataset.equipOp||s.selectedOp);$('modalRoot').innerHTML=''}else if(k=b.dataset.salvage)salvage(Number(k));else if(k=b.dataset.unequip)unequip(k);else if(k=b.dataset.tech)research(k);else if(k=b.dataset.claim)claimQuest(k);else if(k=b.dataset.missionView)showMissionView(k);else if(b.id==='claimAllBtn')claimAllQuests();else if(k=b.dataset.dispatch)dispatch(k);else if(k=b.dataset.policy)setPolicy(k);else if(k=b.dataset.zone)selectZone(Number(k));else if(b.dataset.gear)strengthen();else if(b.id==='rebootBtn')reboot();else if(b.id==='forgeBtn')forge();else if(b.id==='storageExpand')upgradeStorage();});
  $('goalAction').onclick=()=>go('battle');$('advanceBtn').onclick=()=>advance();$('saveNow').onclick=()=>toast(save()?'存档已保存':'本机无法写入存档');$('exportSave').onclick=()=>{save();modal('导出存档',JSON.stringify(s),false)};$('importSave').onclick=()=>modal('导入存档','',true);$('hardReset').onclick=reset;
  $('autoAdvance').onchange=e=>{if(researchLv('autonomy')){s.autoAdvance=e.target.checked;changed()}};$('autoEquip').onchange=e=>{s.autoEquip=e.target.checked;if(s.autoEquip)autoEquipBest();changed()};$('autoSalvage').onchange=e=>setAutoSalvage(e.target.value);$('rarityFilter').onchange=e=>setInventoryFilter(e.target.value);
  document.addEventListener('visibilitychange',()=>{if(document.hidden)save();else{const now=Date.now();const off=Math.min(MAX_OFFLINE,Math.max(0,(now-lastTick)/1000));if(off>3)calculateOffline(off);lastTick=now;changed()}});window.addEventListener('pagehide',save);

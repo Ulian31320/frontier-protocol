@@ -96,3 +96,33 @@ html:not(.app-ready) .page:target{display:block!important}
 .portrait .operator-portrait-sprite{display:none;position:absolute;inset:0;background:url('../assets/five-operators.webp') no-repeat;background-size:500% 100%;z-index:1}
 .operator-art-ready .portrait .operator-portrait-sprite{display:block}
 .portrait .rank{z-index:2}
+
+
+/* v0.6.1 角色档案比例修正：图集每列 160×220，严禁铺满宽画框导致变形。
+   档案容器与图集切片分别布局：图集切片始终保持 8:11 的半身像比例。 */
+.grid-ops .operator-card .portrait{height:310px;display:flex;justify-content:center;align-items:center;overflow:hidden;background:linear-gradient(150deg,#e7ece9,#f8faf7 64%,#e8eeeb);}
+.grid-ops .operator-card .portrait .operator-portrait-sprite{
+  position:relative;inset:auto;left:auto;top:auto;right:auto;bottom:auto;
+  flex:0 0 auto;width:min(225px,100%);height:auto;aspect-ratio:8/11;
+  transform:none;background-size:500% 100%;background-repeat:no-repeat;
+  background-position-y:center;z-index:1;
+}
+.grid-ops .operator-card .portrait .rank{z-index:3;}
+.grid-ops .operator-card .portrait svg{opacity:.12;}
+.operator-art-ready .grid-ops .operator-card .portrait svg{opacity:0;}
+@media(max-width:1100px){.grid-ops .operator-card .portrait{height:270px}.grid-ops .operator-card .portrait .operator-portrait-sprite{width:min(196px,100%)}}
+@media(max-width:650px){.grid-ops .operator-card .portrait{height:285px}.grid-ops .operator-card .portrait .operator-portrait-sprite{width:min(207px,100%)}}
+
+/* 任务中心的两个子页：内容互斥显示，手机端按钮换行。 */
+.mission-subpage[hidden]{display:none!important}
+.mission-mode-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0 23px;padding:5px;background:#e7edea;border:1px solid #cbd7d1}
+.mission-mode{border:1px solid transparent;background:transparent;color:#566d71;padding:15px 12px;font-weight:750;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:12px;min-height:50px}
+.mission-mode:hover{background:#fff9}
+.mission-mode.active{background:#fff;border-color:#cbd7d1;color:#273e47;box-shadow:inset 0 -3px #d7ae52}
+.mission-ready-count{display:inline-flex;justify-content:center;align-items:center;min-width:24px;height:24px;border-radius:50%;background:#d4a94a;color:#1c303b;font-size:12px}
+.mission-mode-hint{font-size:10px;font-weight:500;color:#839499}
+.mission-subhead{align-items:center;gap:15px;flex-wrap:wrap}
+.mission-subhead>div{display:flex;flex-direction:column;gap:4px}
+.mission-subhead .btn{margin-left:auto}
+.mission-mode:focus-visible{outline:2px solid #a67b2c;outline-offset:2px}
+@media(max-width:600px){.mission-mode{font-size:13px;gap:7px;padding:11px 5px}.mission-mode-hint{display:none}.mission-subhead .btn{margin:0;width:100%}}
