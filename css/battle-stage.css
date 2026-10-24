@@ -1,0 +1,37 @@
+/* v0.5 四人干员半身立绘舞台：移动端友好，兼容降低动态效果偏好。 */
+.battlefield.portrait-mode{min-height:328px;overflow:hidden;background:radial-gradient(circle at 73% 24%,#526e77,#2a4652 48%,#192e3a);border:1px solid #46626e;color:#f3f1e8}
+.battlefield.portrait-mode .bfhud{z-index:7;border-left:3px solid #e9c56d;background:#142d39e0}
+.battlefield.portrait-mode .figures{height:298px;display:flex;align-items:flex-end;justify-content:space-between;gap:8px;padding:64px 14px 28px}
+.battlefield.portrait-mode .fig.hero{width:auto;height:213px;min-width:0;flex:1;display:flex;align-items:flex-end;gap:5px;animation:none;filter:none;z-index:3}
+.battlefield.portrait-mode .fig.enemy{flex:0 0 100px;width:100px;height:145px;margin:0 5px 4px 0;z-index:4;filter:drop-shadow(0 9px 6px #0007)}
+.battlefield.portrait-mode .beam{display:none}
+.battlefield.portrait-mode .bfline{opacity:.4}
+.combat-operator{flex:1 1 0;min-width:0;max-width:116px;position:relative;border:1px solid #7d93985c;border-top:3px solid var(--op-color);display:flex;flex-direction:column;justify-content:flex-end;background:#1a3241e8;box-shadow:0 3px 13px #10232f9c;animation:combat-breathe 2.6s ease-in-out infinite;overflow:visible}
+.combat-operator:nth-child(2){animation-delay:.5s}.combat-operator:nth-child(3){animation-delay:1s}.combat-operator:nth-child(4){animation-delay:1.5s}
+.combat-art{height:150px;position:relative;overflow:hidden;background:#b9cbc9}
+.combat-vector,.combat-sprite{position:absolute;inset:0}
+.combat-vector svg{width:100%;height:100%}
+.combat-sprite{display:none;background:url('../assets/five-operators.webp') no-repeat;background-size:500% 100%}
+.battlefield.battle-art-ready .combat-sprite{display:block}
+.combat-flare{position:absolute;inset:0;pointer-events:none;opacity:0;background:linear-gradient(115deg,transparent 25%,#ffffff7d 50%,transparent 70%);transform:translateX(-120%)}
+.combat-identity{padding:6px 5px 2px;display:flex;justify-content:space-between;gap:3px;min-width:0;font-size:10px;color:#f7f6ef}
+.combat-identity strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.combat-identity span{font-size:9px;color:#e4c76f;white-space:nowrap}
+.combat-role{padding:0 5px 5px;font-size:8px;color:#9cb9bf;white-space:nowrap;overflow:hidden}
+.combat-charge{height:3px;margin:0 5px 5px;background:#325562;overflow:hidden}
+.combat-charge i{display:block;height:100%;width:80%;background:var(--op-color);animation:combat-charge 1.6s linear infinite}
+.combat-badge{position:absolute;right:14px;top:16px;z-index:7;padding:8px 10px;background:#172f3bda;color:#b6d0d2;font-size:9px;letter-spacing:.09em}
+.combat-badge b{color:#f1d482}
+.combat-actionline{position:absolute;bottom:9px;left:15px;right:15px;z-index:7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f3dca2;font-size:10px;text-shadow:0 2px 3px #000}
+.combat-fx-layer{position:absolute;inset:0;pointer-events:none;z-index:5;overflow:hidden}
+.combat-tracer{position:absolute;display:block;width:18px;height:4px;background:var(--op-color);box-shadow:0 0 12px var(--op-color),0 0 6px #fff;border-radius:4px;animation:combat-shot .42s both}
+.combat-operator.combat-strike{animation:combat-strike .38s ease-out}
+.combat-operator.combat-strike .combat-flare{animation:combat-flare .4s ease-out}
+.combat-line-flash{animation:combat-title .5s ease-out}
+@keyframes combat-breathe{50%{transform:translateY(-3px)}}@keyframes combat-charge{from{transform:translateX(-90%)}to{transform:translateX(135%)}}
+@keyframes combat-strike{40%{transform:translate(8px,-4px);filter:brightness(1.28)}to{transform:none}}@keyframes combat-flare{35%{opacity:.7;transform:translateX(20%)}to{opacity:0;transform:translateX(130%)}}
+@keyframes combat-shot{from{opacity:0}20%{opacity:1}85%{opacity:1}to{opacity:0;transform:translate(var(--tx),var(--ty))}}
+@keyframes combat-title{from{opacity:.2;transform:translateX(-9px)}to{opacity:1;transform:none}}
+@media(max-width:1100px){.battlefield.portrait-mode .figures{padding-left:8px;padding-right:7px;gap:4px}.battlefield.portrait-mode .fig.enemy{flex-basis:80px;width:80px}.combat-identity{font-size:9px}}
+@media(max-width:520px){.battlefield.portrait-mode{min-height:265px}.battlefield.portrait-mode .figures{height:242px;padding:61px 6px 28px;gap:4px}.battlefield.portrait-mode .fig.hero{height:161px;gap:3px}.battlefield.portrait-mode .fig.enemy{flex:0 0 66px;width:66px;height:109px;margin-right:2px}.combat-art{height:108px}.combat-identity{flex-direction:column;align-items:flex-start;padding:5px 3px 1px;font-size:9px}.combat-identity span{font-size:7px}.combat-role{font-size:6px;padding:0 3px 3px}.combat-charge{margin:0 3px 3px}.combat-badge{top:12px;right:7px;padding:6px;font-size:8px}.combat-actionline{left:8px;right:8px;font-size:9px}}
+@media(prefers-reduced-motion:reduce){.combat-operator,.combat-charge i,.combat-operator.combat-strike,.combat-flare,.combat-line-flash,.combat-tracer{animation:none!important}}

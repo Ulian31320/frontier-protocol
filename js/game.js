@@ -1,6 +1,6 @@
 'use strict';
 /*
- * 《边境协议》v0.4.0 游戏主引擎
+ * 《边境协议》v0.5.0 游戏主引擎
  * 放置成长参考 Progress Knight 的长期经验曲线、Trimps 的区域推进与地图奖励。
  * 该项目的素材、文案和程序为原创实现；不包含上述游戏的源代码。
  *
@@ -17,11 +17,11 @@ const costText=c=>Object.entries(c).filter(([,v])=>v>0).map(([k,v])=>`${fmt(v)} 
 // 干员配表：沿用现有代码 ID，扩展到 12 名；视觉统一采用原创工业科幻 SVG 角色卡。
 // 专精只在编入行动小队时生效；未入队的干员仍可配装和训练。
 const opDefs={
- lin:{name:'临川',role:'侦察 / VANGUARD',tag:'SR-01',desc:'快速侦察的先遣队长，擅长追踪异常讯号。',base:5.8,bonus:.28,price:{credits:0,data:0},colors:['#647d7b','#334953','#e3bc63'],visual:'visor',talent:'对普通敌人造成额外 12% 伤害',passive:'assault',amount:.12},
- yor:{name:'尧灯',role:'术师 / CASTER',tag:'SR-02',desc:'能源调制工程师，以电子阵列压制敌军。',base:9.5,bonus:.32,price:{credits:310,data:18},colors:['#b9a1b2','#424e69','#eac8bd'],visual:'antenna',talent:'全队伤害 +6%',passive:'power',amount:.06},
- shi:{name:'初砾',role:'重装 / DEFENDER',tag:'SR-03',desc:'前沿重装防护专员，战术盾牌与厚甲的专家。',base:13.2,bonus:.35,price:{credits:680,data:65},colors:['#9aadae','#53595c','#e7c47e'],visual:'shield',talent:'小队耐久 +55，并降低承受伤害 8%',passive:'guard',amount:.08},
- sai:{name:'赛琳',role:'医疗 / MEDIC',tag:'MR-04',desc:'巡回救护员，具备野外自动修复与急救能力。',base:4.6,bonus:.27,price:{credits:160,data:10},colors:['#8cbcae','#d2dad0','#72a7a1'],visual:'medic',talent:'护盾修复速度 +3 /秒',passive:'heal',amount:3},
- nuo:{name:'诺瓦',role:'狙击 / SNIPER',tag:'SR-05',desc:'轻型高精度步枪操作者，优先清除危险首领。',base:16.8,bonus:.32,price:{credits:1200,data:95,alloy:80},colors:['#aebcce','#344a67','#eec976'],visual:'hood',talent:'对区域首领伤害 +24%',passive:'boss',amount:.24},
+ lin:{name:'凛御银灰',role:'先锋 / VANGUARD',tag:'SR-01',desc:'快速侦察的先遣队长，擅长追踪异常讯号。',base:5.8,bonus:.28,price:{credits:0,data:0},colors:['#647d7b','#334953','#e3bc63'],visual:'visor',talent:'雪境号令 · 先遣压制',passive:'assault',amount:.12},
+ yor:{name:'重岳',role:'近卫 / GUARD',tag:'SR-02',desc:'能源调制工程师，以电子阵列压制敌军。',base:9.5,bonus:.32,price:{credits:310,data:18},colors:['#b9a1b2','#424e69','#eac8bd'],visual:'antenna',talent:'万壑崩云 · 连击强化',passive:'power',amount:.06},
+ shi:{name:'黍',role:'重装 / DEFENDER',tag:'SR-03',desc:'前沿重装防护专员，战术盾牌与厚甲的专家。',base:13.2,bonus:.35,price:{credits:680,data:65},colors:['#9aadae','#53595c','#e7c47e'],visual:'shield',talent:'丰岁庇护 · 全队防护',passive:'guard',amount:.08},
+ sai:{name:'祀',role:'辅助 / SUPPORTER',tag:'MR-04',desc:'巡回救护员，具备野外自动修复与急救能力。',base:4.6,bonus:.27,price:{credits:160,data:10},colors:['#8cbcae','#d2dad0','#72a7a1'],visual:'medic',talent:'青溯脉冲 · 寒冷辅助',passive:'heal',amount:3},
+ nuo:{name:'明河',role:'近卫 / GUARD',tag:'SR-05',desc:'轻型高精度步枪操作者，优先清除危险首领。',base:16.8,bonus:.32,price:{credits:1200,data:95,alloy:80},colors:['#aebcce','#344a67','#eec976'],visual:'hood',talent:'龙吟断流 · 单体突破',passive:'boss',amount:.24},
  qi:{name:'绮罗',role:'辅助 / SUPPORT',tag:'MR-06',desc:'通讯及野外检索专家，回收遗漏的战场物资。',base:7.4,bonus:.29,price:{credits:350,data:34},colors:['#c6a3a0','#6c536d','#e4b978'],visual:'cap',talent:'装备掉落概率 +7%',passive:'loot',amount:.07},
  su:{name:'溯影',role:'近卫 / GUARD',tag:'SR-07',desc:'使用高频近战器械，适于持续高压交战。',base:22,bonus:.34,price:{credits:2700,data:260,parts:20},colors:['#a8b7c0','#282f44','#e2a763'],visual:'blade',talent:'全队伤害 +9%',passive:'power',amount:.09},
  en:{name:'恩栖',role:'重装 / DEFENDER',tag:'SR-08',desc:'防线工程师，在远征队前方展开承压壁垒。',base:12,bonus:.32,price:{credits:1800,data:180,alloy:130},colors:['#b5a9a0','#485f65','#e6c18b'],visual:'shield',talent:'护盾耐久 +100',passive:'hp',amount:100},

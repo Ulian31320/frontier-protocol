@@ -1,6 +1,6 @@
 # 边境协议 / FRONTIER PROTOCOL
 
-**v0.4.0 · 深层远征与干员编队。** 本作是原创工业科幻放置养成游戏，借鉴开源作品 Progress Knight / Trimps 的数值循环，但没有移植其代码或商业素材。
+**v0.5.0 · 立绘战斗舞台。** 本作是原创工业科幻放置养成游戏，借鉴开源作品 Progress Knight / Trimps 的数值循环，但没有移植其代码或商业素材。
 
 ## 游玩
 
@@ -33,3 +33,11 @@
 ## 原型参考
 
 [Progress Knight](https://github.com/ihtasham42/progress-knight)（Unlicense），[Trimps](https://trimps.github.io/)（玩法参考）。
+
+## v0.5 立绘战斗场景
+
+- 战斗区最多显示当前 `s.squad` 的四名出战干员半身像，按实际出战顺序轮流播放攻击动画；点击编队变化后自动同步。
+- 默认展示 `js/art.js` 的 SVG 肖像；独立 WebP 图集 `assets/five-operators.webp` 存在且成功加载时，自动展示五名角色的三角切面素材。
+- 原有 `animateAttack()` 击杀反馈继续使用，技能文本来自干员配置。不修改战斗数值、关卡、掉落和存档。
+- 第一批对应关系：`lin` 凛御银灰、`yor` 重岳、`shi` 黍、`sai` 祀、`nuo` 明河。保留原有数据键，以免旧存档丢失等级和装备。
+- 图片预处理采用独立精灵图，可替换美术素材而不需要修改游戏逻辑。若仓库没有图集，保留 SVG 降级显示。
