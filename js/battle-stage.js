@@ -44,7 +44,7 @@
  // 引擎原本在击杀后触发 animateAttack；替换该函数而不改变任何 DPS 运算。
  if(typeof animateAttack==='function')animateAttack=()=>strike(true);
  sync();
- const portraitSheet=new Image();portraitSheet.onload=()=>stage.classList.add('battle-art-ready');portraitSheet.onerror=()=>stage.classList.remove('battle-art-ready');portraitSheet.src=spriteUrl;
+ const portraitSheet=new Image();portraitSheet.onload=()=>{stage.classList.add('battle-art-ready');document.documentElement.classList.add('operator-art-ready')};portraitSheet.onerror=()=>stage.classList.remove('battle-art-ready');portraitSheet.src=spriteUrl;
  const timer=window.setInterval(()=>{sync();strike(false)},1600);
  window.addEventListener('pagehide',()=>clearInterval(timer),{once:true});
 })();
